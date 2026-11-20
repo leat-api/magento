@@ -26,7 +26,7 @@ class LoyaltyTransactionHash extends LoyaltyTransactionOrderItems
      * @throws \Magento\Framework\Exception\AuthenticationException
      * @throws \Piggy\Api\Exceptions\PiggyRequestException
      */
-    public function getTransactions(array $data = [], callable $callback = null, $transactionType = null): array
+    public function getTransactions(array $data = [], ?callable $callback = null, $transactionType = null): array
     {
         return parent::getTransactions($data, $callback ?? static::getTransactionFilter());
     }
@@ -47,6 +47,11 @@ class LoyaltyTransactionHash extends LoyaltyTransactionOrderItems
 
             $mappedTransactions = [];
             array_walk($transactions, function ($transaction) use (&$mappedTransactions) {
+                // Not every transaction type has attributes (a reward redemption doesn't)
+                if (!method_exists($transaction, 'getAttributes')) {
+                    return;
+                }
+
                 $transactionHash = $transaction->getAttributes()[Transaction::INTERNAL_TRANSACTION_HASH] ?? '';
                 if (!empty($transactionHash)) {
                     $mappedTransactions[] = $transactionHash;

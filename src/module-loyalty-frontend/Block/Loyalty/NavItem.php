@@ -52,6 +52,7 @@ class NavItem extends Template
         'refer' => 'refer.svg',
         'activity' => 'activity.svg',
         'giftcard' => 'giftcard.svg',
+        'earn_points' => 'earn-points.svg',
     ];
 
     /**

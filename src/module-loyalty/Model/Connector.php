@@ -68,11 +68,12 @@ class Connector extends AbstractConnector
                 if (!$test) {
                     $this->sendErrorEmail();
                 }
+                // Connection failures (e.g. Guzzle ConnectException) have no response.
+                $response = method_exists($error, 'getResponse') ? $error->getResponse() : null;
                 throw new AuthenticationException(
                     __(
-                        "Failed to retrieve access token from Leat, %1 %2",
-                        $error->getResponse()->getStatusCode(),
-                        $error->getResponse()->getReasonPhrase()
+                        "Failed to retrieve access token from Leat, %1",
+                        $response ? $response->getStatusCode() . ' ' . $response->getReasonPhrase() : $error->getMessage()
                     )
                 );
             }

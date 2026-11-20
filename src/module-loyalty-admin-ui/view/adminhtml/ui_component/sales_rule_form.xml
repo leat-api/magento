@@ -14,5 +14,37 @@
                 </additionalClasses>
             </settings>
         </field>
+        <field name="leat_combinable" formElement="checkbox" sortOrder="31">
+            <settings>
+                <dataType>boolean</dataType>
+                <label translate="true">Combinable with other Leat vouchers</label>
+                <dataScope>leat_combinable</dataScope>
+                <notice translate="true">Allows this Leat voucher to be stacked with other Leat vouchers on one order. Set "Discard subsequent rules" to No for stacking rules.</notice>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="number">0</map>
+                            <map name="true" xsi:type="number">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+        <field name="leat_max_applied" formElement="input" sortOrder="32">
+            <settings>
+                <dataType>number</dataType>
+                <label translate="true">Max amount applied to cart</label>
+                <dataScope>leat_max_applied</dataScope>
+                <validation>
+                    <rule name="required-entry" xsi:type="boolean">true</rule>
+                    <rule name="validate-digits" xsi:type="boolean">true</rule>
+                    <rule name="validate-greater-than-zero" xsi:type="boolean">true</rule>
+                </validation>
+                <notice translate="true">How many vouchers of this reward can be applied to one cart. Applying a newer one removes the oldest. Default 1.</notice>
+            </settings>
+        </field>
     </fieldset>
 </form>

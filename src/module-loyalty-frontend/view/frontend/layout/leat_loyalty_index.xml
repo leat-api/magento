@@ -47,6 +47,13 @@
                             <item name="id" xsi:type="string">leat-refer</item>
                             <item name="label" xsi:type="string" translate="true">Refer a Friend</item>
                         </item>
+                        <item name="earn_points" xsi:type="array">
+                            <item name="class" xsi:type="string">Leat\LoyaltyFrontend\Block\Widget\EarnPoints</item>
+                            <item name="sort_order" xsi:type="number">45</item>
+                            <item name="enabled" xsi:type="boolean">true</item>
+                            <item name="id" xsi:type="string">leat-earn-points</item>
+                            <item name="label" xsi:type="string" translate="true">Earn points</item>
+                        </item>
                         <item name="activity" xsi:type="array">
                             <item name="class" xsi:type="string">Leat\LoyaltyFrontend\Block\Widget\ActivityLog</item>
                             <item name="sort_order" xsi:type="number">50</item>

@@ -20,6 +20,18 @@ use Magento\Quote\Model\Quote\QuantityCollector;
 class GiftProductManager
 {
     /**
+     * Buy request key that keeps a voucher gift line apart from normal lines of the same product, like the
+     * recipient fields do for gift cards (see PreventGiftcardMergePlugin and CompareOptionsPlugin).
+     */
+    public const string BUYREQUEST_GIFT_RULE_ID = 'leat_gift_rule_id';
+
+    /**
+     * Buy request key with the loyalty transaction UUID of the voucher that added the gift line. Every voucher owns
+     * its gift line, so removing a voucher removes exactly its gift and two vouchers never stack onto one line.
+     */
+    public const string BUYREQUEST_VOUCHER_UUID = 'leat_gift_voucher_uuid';
+
+    /**
      * @var Logger
      */
     private Logger $logger;
@@ -33,6 +45,7 @@ class GiftProductManager
      * @param ExtensionAttributesRepository $extensionRepository
      * @param QuantityCollector $quantityCollector
      * @param Connector $leatConnector
+     * @param GiftItemInfo $giftItemInfo
      */
     public function __construct(
         protected ProductRepositoryInterface $productRepository,
@@ -42,7 +55,8 @@ class GiftProductManager
         protected ExtensionAttributesFactory $itemExtensionFactory,
         protected ExtensionAttributesRepository $extensionRepository,
         protected QuantityCollector $quantityCollector,
-        protected Connector $leatConnector
+        protected Connector $leatConnector,
+        protected GiftItemInfo $giftItemInfo
     ) {
         $this->logger = $this->leatConnector->getLogger('reward');
     }
@@ -72,6 +86,7 @@ class GiftProductManager
      * @param string $skuString Comma-separated SKUs
      * @param int $maxQty Maximum number of gift items to add
      * @param float $discountPercent Percentage discount to apply
+     * @param string|null $voucherUuid Loyalty transaction UUID of the voucher the gift lines belong to
      * @return void
      * @throws LocalizedException
      */
@@ -80,7 +95,8 @@ class GiftProductManager
         int $ruleId,
         string $skuString,
         int $maxQty = 1,
-        float $discountPercent = 100.0
+        float $discountPercent = 100.0,
+        ?string $voucherUuid = null
     ): void {
         if (empty($skuString)) {
             return;
@@ -104,7 +120,7 @@ class GiftProductManager
             }
 
             try {
-                $this->addSingleGiftProduct($quote, $ruleId, trim($sku), $discountPercent);
+                $this->addSingleGiftProduct($quote, $ruleId, trim($sku), $discountPercent, $voucherUuid);
                 $itemsAdded++;
             } catch (\Exception $e) {
                 $this->logger->log(sprintf(
@@ -140,7 +156,13 @@ class GiftProductManager
      * @return void
      * @throws LocalizedException
      */
-    private function addSingleGiftProduct(Quote $quote, int $ruleId, string $sku, float $discountPercent = 100.0): void
+    private function addSingleGiftProduct(
+        Quote $quote,
+        int $ruleId,
+        string $sku,
+        float $discountPercent = 100.0,
+        ?string $voucherUuid = null
+    ): void
     {
         try {
             $product = $this->productRepository->get($sku);
@@ -156,13 +178,14 @@ class GiftProductManager
                         $configurableData['parent_product'],
                         $configurableData['super_attribute'],
                         $sku,
-                        $discountPercent
+                        $discountPercent,
+                        $voucherUuid
                     );
                     return;
                 }
             }
 
-            $this->addSimpleGiftProduct($quote, $ruleId, $product, $sku, $discountPercent);
+            $this->addSimpleGiftProduct($quote, $ruleId, $product, $sku, $discountPercent, $voucherUuid);
         } catch (\Exception $e) {
             throw new LocalizedException(__('Could not add gift product %1: %2', $sku, $e->getMessage()));
         }
@@ -184,7 +207,8 @@ class GiftProductManager
         int $ruleId,
         \Magento\Catalog\Api\Data\ProductInterface $product,
         string $originalSku,
-        float $discountPercent = 100.0
+        float $discountPercent = 100.0,
+        ?string $voucherUuid = null
     ): CartItemInterface {
         // Check if the gift is already in the cart
         foreach ($quote->getAllItems() as $item) {
@@ -194,7 +218,8 @@ class GiftProductManager
             // Then check by stored extension attributes
             $isStoredGift = $this->isGiftFromRule($item, $ruleId);
 
-            if (($isFlaggedGift || $isStoredGift) && $item->getSku() === $product->getSku()) {
+            if (($isFlaggedGift || $isStoredGift) && $item->getSku() === $product->getSku()
+                && $this->getVoucherUuid($item) === $voucherUuid) {
                 $this->logger->debug(sprintf(
                     'Gift product %s from rule %d already exists in cart, skipping addition',
                     $product->getSku(),
@@ -204,7 +229,11 @@ class GiftProductManager
             }
         }
 
-        $quoteItem = $quote->addProduct($product, 1);
+        $quoteItem = $quote->addProduct($product, new \Magento\Framework\DataObject([
+            'qty' => 1,
+            self::BUYREQUEST_GIFT_RULE_ID => $ruleId,
+            self::BUYREQUEST_VOUCHER_UUID => $voucherUuid,
+        ]));
 
         if (is_string($quoteItem)) {
             throw new LocalizedException(__($quoteItem));
@@ -232,11 +261,13 @@ class GiftProductManager
         \Magento\Catalog\Api\Data\ProductInterface $parentProduct,
         array $superAttributeConfig,
         string $originalSku,
-        float $discountPercent = 100.0
+        float $discountPercent = 100.0,
+        ?string $voucherUuid = null
     ): CartItemInterface {
         // Check if the configurable gift is already in the cart
         foreach ($quote->getAllItems() as $item) {
             if ($this->isGiftFromRule($item, $ruleId) &&
+                $this->getVoucherUuid($item) === $voucherUuid &&
                 $item->getProduct()->getSku() === $parentProduct->getSku()) {
                 // Check if it's the same configuration
                 $sameConfig = true;
@@ -256,7 +287,9 @@ class GiftProductManager
 
         $buyRequest = new \Magento\Framework\DataObject([
             'super_attribute' => $superAttributeConfig,
-            'qty' => 1
+            'qty' => 1,
+            self::BUYREQUEST_GIFT_RULE_ID => $ruleId,
+            self::BUYREQUEST_VOUCHER_UUID => $voucherUuid,
         ]);
 
         $quoteItem = $quote->addProduct($parentProduct, $buyRequest);
@@ -389,6 +422,20 @@ class GiftProductManager
     }
 
     /**
+     * Loyalty transaction UUID of the voucher that added a gift line, null for lines without one
+     *
+     * @param CartItemInterface $item
+     * @return string|null
+     */
+    public function getVoucherUuid(CartItemInterface $item): ?string
+    {
+        $value = $item->getOptionByCode('info_buyRequest')?->getValue();
+        $buyRequest = is_array($value) ? $value : (json_decode((string)$value, true) ?: []);
+
+        return $buyRequest[self::BUYREQUEST_VOUCHER_UUID] ?? null;
+    }
+
+    /**
      * Check if item is a gift from a specific rule
      *
      * @param CartItemInterface $item
@@ -397,13 +444,8 @@ class GiftProductManager
      */
     public function isGiftFromRule(CartItemInterface $item, int $ruleId): bool
     {
-        $extensionAttributes = $item->getExtensionAttributes();
-        if (!$extensionAttributes) {
-            return false;
-        }
-
-        return $extensionAttributes->getIsGift() &&
-               $extensionAttributes->getGiftRuleId() === $ruleId;
+        // Falls back to the stored gift attributes when they are not loaded on the item
+        return $this->giftItemInfo->getGiftRuleId($item) === $ruleId;
     }
 
     /**

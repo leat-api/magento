@@ -113,8 +113,12 @@ class AddLeatBalanceToOrder implements ObserverInterface
                     'balance_amount' => $balanceAmount
                 ]
             );
+        } catch (LocalizedException $e) {
+            // Fail closed: the quote total already includes the balance, so an invalid amount must stop the order
+            throw $e;
         } catch (\Exception $e) {
             // Log error but don't stop order placement
+            $logger = $this->leatConnector->getLogger(LeatBalanceRepository::LOGGER_PURPOSE);
             $logger->log(
                 'Error transferring leat balance to order: ' . $e->getMessage() . PHP_EOL . $e->getTraceAsString(),
             );

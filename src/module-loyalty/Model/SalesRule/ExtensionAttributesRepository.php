@@ -78,4 +78,26 @@ class ExtensionAttributesRepository
     {
         return $this->resource->getSalesRuleIdByRewardUuid($rewardUuid);
     }
+
+    /**
+     * Get combinability meta of the sales rules mapped to the given reward UUIDs
+     *
+     * @param string[] $rewardUuids
+     * @param int $storeId
+     * @return array<string, array{combinable: bool, max_applied: int, sort_order: int, name: string}>
+     */
+    public function getRuleMetaByRewardUuids(array $rewardUuids, int $storeId = 0): array
+    {
+        return $this->resource->getRuleMetaByRewardUuids($rewardUuids, $storeId);
+    }
+
+    /**
+     * @param int[] $ruleIds
+     * @param int $storeId
+     * @return array<int, string>
+     */
+    public function getRuleLabels(array $ruleIds, int $storeId): array
+    {
+        return $this->resource->getRuleLabels($ruleIds, $storeId);
+    }
 }

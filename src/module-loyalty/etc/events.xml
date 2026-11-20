@@ -6,6 +6,8 @@
                   instance="Leat\Loyalty\Observer\AddLeatBalanceToOrder"/>
         <observer name="leat_loyalty_verify_giftcard_balance"
                   instance="Leat\Loyalty\Observer\CheckGiftcardBeforeQuoteSubmit" />
+        <observer name="leat_loyalty_verify_vouchers"
+                  instance="Leat\Loyalty\Observer\CheckVouchersBeforeQuoteSubmit" />
 
         <!--    split discount    -->
         <observer name="add_splitdiscount_data_to_order" instance="Leat\Loyalty\Observer\Discount\AddDataToOrder" />

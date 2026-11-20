@@ -33,6 +33,11 @@ Enhances the display and management of gift products added to cart by promotions
 - Maintains gift status through checkout process
 - Ensures quantities respect rule limitations even when manually adjusted
 - Shows associated promotion rule for each gift item
+- Voucher gifts show a "part of voucher" label instead of the edit action and quantity input (cart page and minicart,
+  `Plugin\Cart\GiftItemLabel`); removing the gift line unapplies its voucher
+- The minicart subtotal shows the applied discount (`Plugin\Minicart\AddDiscount`), so a voucher applied on the loyalty
+  page is visible before the cart page is opened
+- The cart and checkout summary list the discount per applied voucher (`leat-vouchers`)
 
 **Technical details:**
 - Uses extension attributes to track gift status
@@ -280,3 +285,15 @@ The loyalty page is configured through layout XML. You can customize sections, t
     </arguments>
 </referenceBlock>
 ```
+
+### Earn Points Widget
+
+`Block\Widget\EarnPoints` renders the configured earnings (see the Leat_Loyalty README) as cards on the loyalty page,
+registered in `leat_loyalty_index.xml` at sort order 45 (after "Refer a friend").
+
+- Pressing a button with points opens the configured link in a new tab and POSTs the earning id to
+  `leat/earnpoints/claim` (`Controller\EarnPoints\Claim`). The controller reads points and repeat from the config,
+  never from the request. The button turns into the configured "Completed" label once the server confirms (or says it
+  was already claimed).
+- Buttons of 0-point earnings are plain links.
+- Behaviour lives in `web/js/view/leat-earn-points.js` (`leatEarnPoints`, initialised through `data-mage-init`).

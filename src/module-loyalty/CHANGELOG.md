@@ -1,5 +1,59 @@
 # Leat Loyalty Module Changelog
 
+# 2.0.1 - Earn points, stackable vouchers, newsletter sync
+
+## NEW FEATURES
+
+### Earn Points
+* Admin configurable earnings (icon, title, button text, link, points, repeat, key) with a drag/drop sortable table, under Leat Loyalty > Configuration > Earn Points.
+* New "Earn points" widget and navigation item; claims are locked per customer, earning and period (table `leat_loyalty_earning_claim`).
+* Points are credited immediately; the queue (`earn_reward`) is only a fallback. Credits with a note show it in the activity log.
+* Built-in icons for common actions and social media, extendable through `di.xml` (`Leat\Loyalty\Model\EarnPoints\Icons`) and theme-overridable. See the README.
+
+### Multiple vouchers per cart
+* Vouchers can be stacked: new cart price rule fields "Combinable with other Leat vouchers" and "Max vouchers of this reward on one cart".
+* Any number of combinable vouchers plus one non-combinable voucher. The lowest sort order wins between non-combinable ones; losers are removed with a message.
+* Fixed amount and gift rules apply once per voucher.
+* Discount per voucher is shown in the cart, checkout summary and minicart.
+* New admin setting "Apply a redeemed reward to the cart right away".
+* Apply/remove/redeem requests return the refreshed voucher list, so fewer follow-up requests.
+
+### Voucher gift lines
+* Every voucher gets its own read-only gift line with a "part of voucher" label.
+* Removing a gift line unapplies its voucher; emptying the cart unapplies all vouchers (also via REST/GraphQL).
+
+### Newsletter sync
+* Newsletter (un)subscriptions are synced to the Leat contact (queue types `newsletter_subscribe`, `newsletter_unsubscribe`).
+* New admin setting for the Leat subscription types to sync (all when none selected).
+
+### Admin
+* Reward dropdown in the cart price rule labels rewards by scope (Global, Website, Store View) instead of store name.
+
+
+## CHANGES
+
+* Vouchers are checked again right before order placement (`CheckVouchersBeforeQuoteSubmit`); a failed check stops the order.
+* The order gets a comment when a voucher could not be marked as used or had no effect.
+* `AppliedCouponsManager::addCoupon()` returns a `CombinationResult`, `removeCoupon()` takes an optional quote and `resetGift()` is now `removeAllCoupons()`.
+* `Config::getShopUuid()` accepts a scope type.
+* The sales rule extension attributes plugin only handles extension attributes; the admin form saves through `RuleSavePlugin`.
+* Cart/checkout sections reload once after a burst of voucher actions, not on every click.
+* Removed `leat/reward/collectiblerewards` from `sections.xml`.
+
+
+## BUG FIXES
+
+* A voucher without effect is removed from the cart with a message, and skipped on order placement, so it is never marked as used for nothing.
+* Rewards without a linked cart price rule can't be applied; physical ones are refused before points are spent.
+* Per rule discount arrays reset on every totals collect, so old amounts no longer count.
+* Prepaid balance is validated server-side; order placement fails on an invalid amount.
+* Async queue jobs are locked per job and the cron can't overlap, so a request runs only once.
+* Transaction lookup filters all fetched results instead of partial.
+* Connection errors without a response (e.g. timeouts) no longer crash the access token request.
+* Gift lines of the same product no longer merge with other cart lines.
+* `ProgramSettings` AJAX controller requires the config ACL resource; scope values in the "fetch credit name" button are escaped.
+* Typo fixes in the async queue error email.
+
 ---
 # 1.2.0 - Order API implementation
 

@@ -1,0 +1,63 @@
+<?php
+/**
+ * Earn points widget template
+ *
+ * @var \Leat\LoyaltyFrontend\Block\Widget\EarnPoints $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+if (!$block->show()) {
+    return;
+}
+
+$cards = $block->getCards();
+if (empty($cards)) {
+    return;
+}
+
+$pointsName = $block->getPointsName();
+$widgetOptions = json_encode([
+    'claimUrl' => $block->getClaimUrl(),
+    'completedLabel' => $block->getCompletedLabel(),
+]);
+?>
+<section class="<?= $escaper->escapeHtmlAttr($block->getWidgetCssClass()) ?>"
+         id="<?= $escaper->escapeHtmlAttr($block->getWidgetId()) ?>"
+         data-mage-init='{"leatEarnPoints": <?= $escaper->escapeHtmlAttr($widgetOptions, true) ?>}'>
+    <header class="leat-section-header">
+        <h2><?= $escaper->escapeHtml($block->getWidgetHeading()) ?></h2>
+    </header>
+    <div class="leat-earn-points-list">
+        <?php foreach ($cards as $card) : ?>
+            <div class="leat-earn-points-card" data-earning-id="<?= $escaper->escapeHtmlAttr($card['id']) ?>">
+                <span class="leat-earn-points-icon" aria-hidden="true"><?= /* @noEscape */ $card['icon_html'] ?></span>
+                <div class="leat-earn-points-text">
+                    <span class="leat-earn-points-title"><?= $escaper->escapeHtml($card['title']) ?></span>
+                    <?php if ($card['points'] > 0) : ?>
+                        <span class="leat-earn-points-points">
+                            <?= $escaper->escapeHtml($card['points'] . ' ' . $pointsName) ?>
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <?php if ($card['completed']) : ?>
+                    <span class="leat-earn-points-completed"><?= $escaper->escapeHtml($block->getCompletedLabel()) ?></span>
+                <?php elseif ($card['points'] > 0) : ?>
+                    <?php /* Claimable: always a button. Without a link it only claims (nothing opens). */ ?>
+                    <a class="leat-earn-points-button"
+                       href="<?= $card['link'] !== '' ? $escaper->escapeUrl($card['link']) : '#' ?>"
+                       <?= $card['link'] !== '' ? 'target="_blank" rel="noopener"' : 'role="button" data-earn-no-link' ?>
+                       data-earn-claim>
+                        <?= $escaper->escapeHtml($card['button_text'] ?: __('Claim')) ?>
+                    </a>
+                <?php elseif ($card['link'] !== '') : ?>
+                    <a class="leat-earn-points-button"
+                       href="<?= $escaper->escapeUrl($card['link']) ?>"
+                       target="_blank"
+                       rel="noopener">
+                        <?= $escaper->escapeHtml($card['button_text'] ?: $card['title']) ?>
+                    </a>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</section>

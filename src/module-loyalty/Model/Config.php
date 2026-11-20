@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Leat\Loyalty\Model;
 
+use Leat\Loyalty\Model\EarnPoints\Repeat;
 use Leat\LoyaltyAdminUI\Model\Config\Source\OrderExport;
 use Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -19,6 +20,7 @@ class Config
     protected const string XML_PATH_PIGGY_SHIPPING_TAX_SEPARATE = 'leat/order/shipping_tax_seperate';
     protected const string XML_PATH_PIGGY_PENDING_PAYMENT_EXPORT = 'leat/order/allow_pending';
 
+    protected const string XML_PATH_NEWSLETTER_SUBSCRIPTION_TYPES = 'leat/newsletter/subscription_types';
     protected const string XML_PATH_PIGGY_CUSTOMER_GROUP_MAPPING = 'leat/general/customer_group_mapping';
 
     protected const string XML_PATH_PIGGY_PERSONAL_ACCESS_TOKEN = 'leat/connection/personal_access_token';
@@ -31,6 +33,7 @@ class Config
 
     protected const XML_PATH_PIGGY_CREDITS_LABEL = 'leat/credits/label';
     protected const XML_PATH_PIGGY_CREDITS_SHOW_CART = 'leat/credits/show_on_cart_page';
+    protected const XML_PATH_REWARDS_AUTO_APPLY_ON_REDEEM = 'leat/rewards/auto_apply_on_redeem';
     protected const XML_PATH_PIGGY_CREDITS_SHOW_CHECKOUT_SUCCESS = 'leat/credits/show_on_checkout_success_page';
     protected const XML_RAF_ENABLE = 'leat/refer_a_friend/enabled';
     protected const XML_RAF_WIDGET_HEADING = 'leat/refer_a_friend/widget_heading';
@@ -48,6 +51,11 @@ class Config
 
     // Rewards Configuration Constants
     protected const XML_REWARDS_WIDGET_HEADING = 'leat/rewards/widget_heading';
+
+    // Earn Points Configuration Constants
+    protected const XML_EARN_POINTS_WIDGET_HEADING = 'leat/earn_points/widget_heading';
+    protected const XML_EARN_POINTS_COMPLETED_LABEL = 'leat/earn_points/completed_label';
+    protected const XML_EARN_POINTS_EARNINGS = 'leat/earn_points/earnings';
 
     // Referral Popup Configuration Constants
     protected const XML_RAF_POPUP_TITLE = 'leat/refer_a_friend/popup_title';
@@ -212,6 +220,23 @@ class Config
     }
 
     /**
+     * Leat subscription type UUIDs the newsletter status applies to. Empty means all types.
+     *
+     * @param int|null $storeId
+     * @return string[]
+     */
+    public function getNewsletterSubscriptionTypes(?int $storeId = null): array
+    {
+        $value = $this->scopeConfig->getValue(
+            self::XML_PATH_NEWSLETTER_SUBSCRIPTION_TYPES,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+
+        return is_string($value) ? array_values(array_filter(explode(',', $value))) : [];
+    }
+
+    /**
      * Get a list of Customer Group IDs that are allowed to use Leat
      *
      * @param int|null $storeId
@@ -259,11 +284,11 @@ class Config
      * @param int|null $storeId
      * @return string|null
      */
-    public function getShopUuid(?int $storeId = null): ?string
+    public function getShopUuid(?int $storeId = null, string $scopeType = ScopeInterface::SCOPE_STORE): ?string
     {
         $value = $this->scopeConfig->getValue(
             self::XML_PATH_PIGGY_CLIENT_SHOP_UUID,
-            ScopeInterface::SCOPE_STORE,
+            $scopeType,
             $storeId
         );
 
@@ -354,6 +379,21 @@ class Config
     {
         return $this->scopeConfig->isSetFlag(
             self::XML_PATH_PIGGY_CREDITS_SHOW_CART,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+    }
+
+    /**
+     * Apply a redeemed reward to the cart right away
+     *
+     * @param int|null $storeId
+     * @return bool
+     */
+    public function isAutoApplyOnRedeem(?int $storeId = null): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::XML_PATH_REWARDS_AUTO_APPLY_ON_REDEEM,
             ScopeInterface::SCOPE_STORE,
             $storeId
         );
@@ -678,6 +718,103 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $storeId
         );
+    }
+
+    /**
+     * @param int|null $storeId
+     * @return string
+     */
+    public function getEarnPointsWidgetHeading(?int $storeId = null): string
+    {
+        return (string) $this->scopeConfig->getValue(
+            self::XML_EARN_POINTS_WIDGET_HEADING,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+    }
+
+    /**
+     * @param int|null $storeId
+     * @return string
+     */
+    public function getEarnPointsCompletedLabel(?int $storeId = null): string
+    {
+        return (string) $this->scopeConfig->getValue(
+            self::XML_EARN_POINTS_COMPLETED_LABEL,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+    }
+
+    /**
+     * Configured earnings, normalised. Rows without a title are skipped; invalid points become 0
+     * and unknown repeat values become 'once'. The icon is returned as configured; the widget falls back to the
+     * default icon for names it doesn't know.
+     *
+     * @param int|null $storeId
+     * @return array[] list of [id (the key), icon, title, button_text, link, points, repeat]
+     */
+    public function getEarnPointsEarnings(?int $storeId = null): array
+    {
+        $rows = $this->scopeConfig->getValue(
+            self::XML_EARN_POINTS_EARNINGS,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+        // ArraySerialized stores JSON; scope config hands it back as a string
+        if (is_string($rows)) {
+            $rows = json_decode($rows, true);
+        }
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $earnings = [];
+        foreach ($rows as $rowId => $row) {
+            if (!is_array($row) || trim((string) ($row['title'] ?? '')) === '') {
+                continue;
+            }
+
+            // The key is what a claim is locked on; rows saved before keys existed use their row id
+            // Lowercased: the claim table's unique key is case-insensitive
+            $id = strtolower(trim((string) ($row['key'] ?? '')) ?: (string) $rowId);
+            if (isset($earnings[$id])) {
+                continue;
+            }
+
+            $title = trim((string) $row['title']);
+
+            $points = (string) ($row['points'] ?? '');
+            $icon = (string) ($row['icon'] ?? '');
+            $repeat = (string) ($row['repeat'] ?? '');
+            $earnings[$id] = [
+                'id' => $id,
+                'icon' => $icon,
+                'title' => $title,
+                'button_text' => trim((string) ($row['button_text'] ?? '')),
+                'link' => trim((string) ($row['link'] ?? '')),
+                'points' => ctype_digit($points) ? (int) $points : 0,
+                'repeat' => in_array($repeat, Repeat::all(), true) ? $repeat : Repeat::ONCE,
+            ];
+        }
+
+        return array_values($earnings);
+    }
+
+    /**
+     * @param string $id Earning key
+     * @param int|null $storeId
+     * @return array|null
+     */
+    public function getEarnPointsEarning(string $id, ?int $storeId = null): ?array
+    {
+        foreach ($this->getEarnPointsEarnings($storeId) as $earning) {
+            if ($earning['id'] === $id) {
+                return $earning;
+            }
+        }
+
+        return null;
     }
 
 

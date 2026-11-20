@@ -130,4 +130,56 @@ class ContactResource extends AbstractLeatResource
     {
         return $this->jobQueries->hasCreateJob($customerId);
     }
+
+    /**
+     * @param string $contactUuid
+     * @param int|null $storeId
+     * @return \Piggy\Api\Models\Contacts\Subscription[]
+     * @throws LocalizedException
+     */
+    public function getSubscriptions(string $contactUuid, ?int $storeId = null): array
+    {
+        return $this->executeApiRequest(
+            fn () => $this->getClient($storeId)->contactSubscriptions->list($contactUuid),
+            'Error listing contact subscriptions'
+        );
+    }
+
+    /**
+     * @param string $contactUuid
+     * @param string $subscriptionTypeUuid
+     * @param bool $subscribe
+     * @param int|null $storeId
+     * @return void
+     * @throws LocalizedException
+     */
+    public function setSubscribed(
+        string $contactUuid,
+        string $subscriptionTypeUuid,
+        bool $subscribe,
+        ?int $storeId = null
+    ): void {
+        $this->executeApiRequest(
+            function () use ($contactUuid, $subscriptionTypeUuid, $subscribe, $storeId) {
+                $resource = $this->getClient($storeId)->contactSubscriptions;
+                $subscribe
+                    ? $resource->subscribe($contactUuid, $subscriptionTypeUuid)
+                    : $resource->unsubscribe($contactUuid, $subscriptionTypeUuid);
+            },
+            'Error updating contact subscription'
+        );
+    }
+
+    /**
+     * @param int|null $storeId
+     * @return \Piggy\Api\Models\Contacts\SubscriptionType[]
+     * @throws LocalizedException
+     */
+    public function getSubscriptionTypes(?int $storeId = null): array
+    {
+        return $this->executeApiRequest(
+            fn () => $this->getClient($storeId)->subscriptionTypes->list(),
+            'Error listing subscription types'
+        );
+    }
 }

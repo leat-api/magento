@@ -14,8 +14,8 @@
 <script>
     require(['jquery'], function($) {
         $('#fetch_data_button').click(function() {
-            var scope = '<?= $block->getScope() ?>';
-            var scopeId = '<?= $block->getScopeId() ?>';
+            var scope = '<?= $block->escapeJs($block->getScope()) ?>';
+            var scopeId = '<?= $block->escapeJs((string) $block->getScopeId()) ?>';
 
             $.ajax({
                 url: '<?= $block->escapeUrl($block->getAjaxUrl()) ?>',

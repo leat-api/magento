@@ -53,7 +53,8 @@ $rewards = $block->getAvailableRewards();
                         <div class="leat-reward-actions">
                             <button type="button"
                                     class="action primary leat-reward-redeem"
-                                    data-reward-id="<?= $escaper->escapeHtmlAttr($reward->getUuid()) ?>">
+                                    data-reward-id="<?= $escaper->escapeHtmlAttr($reward->getUuid()) ?>"
+                                    data-required-credits="<?= (int)$reward->getRequiredCredits() ?>">
                                 <?= $escaper->escapeHtml(__('Redeem')) ?>
                             </button>
                         </div>

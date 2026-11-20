@@ -88,6 +88,80 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>
+            <group id="rewards" translate="label" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="35">
+                <label>Rewards</label>
+                <field id="auto_apply_on_redeem" translate="label,comment" type="select" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="10">
+                    <label>Apply reward to cart on redeem</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>When a customer redeems a reward, apply the resulting voucher to their cart right away.</comment>
+                </field>
+            </group>
+            <group id="newsletter" translate="label" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="36">
+                <label>Newsletter</label>
+                <field id="subscription_types" translate="label,comment" type="multiselect" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="10">
+                    <label>Subscription types</label>
+                    <source_model>Leat\LoyaltyAdminUI\Model\Config\Source\SubscriptionTypes</source_model>
+                    <comment>Leat subscription types to subscribe or unsubscribe when the customer's newsletter status changes. Leave empty to apply to all types.</comment>
+                </field>
+            </group>
+            <group id="earn_points" translate="label" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="37">
+                <label>Earn Points</label>
+                <field id="widget_heading" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="10">
+                    <label>Widget heading</label>
+                </field>
+                <field id="completed_label" translate="label,comment" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="20">
+                    <label>Completed label</label>
+                    <comment>Shown instead of the button once the customer has earned the points.</comment>
+                </field>
+                <field id="earnings" translate="label,comment" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                    <label>Earnings</label>
+                    <comment><![CDATA[
+                        <p><b>How it works</b><br/>
+                        Every row is a card in the "Earn points" section of the loyalty page. The customer presses the button, the link opens in a new tab and the points are added to their Leat account right away. Each card can be claimed once per period (see Repeat).</p>
+                        <p><b>Columns</b></p>
+                        <ul style="list-style: disc; margin-left: 20px;">
+                            <li><b>Icon</b>: the icon on the card, chosen from the list: general icons (cart, birthday, gift, heart, review, share, newsletter, generic) and social media icons (Instagram, Facebook, X, TikTok, YouTube, Pinterest, LinkedIn, WhatsApp, Snapchat, Twitch, Telegram, Spotify). Unknown or removed icons are shown as "generic". To change how an icon looks or to add your own, see "Changing and adding icons" below.</li>
+                            <li><b>Title</b>: shown on the card. Required, a row without a title is ignored.</li>
+                            <li><b>Button text</b>: the text on the button. When empty: "Claim" for cards with points, the title for cards without points.</li>
+                            <li><b>Button link</b>: opened in a new tab when the button is pressed (for example your Instagram page). For a card with points it is optional: without a link the button only claims the points, which suits things like "Add your birthday". A card without points needs a link to show a button at all.</li>
+                            <li><b>Points</b>: the points the customer gets per claim. With <b>0</b> the card is a plain link: nothing can be claimed, it never shows as completed and there is no points line below the title.</li>
+                            <li><b>Repeat</b>: once, every year, every month, every week or every day. Resets happen on calendar boundaries in the store's timezone: "every year" resets on 1 January, "every month" on the 1st, "every week" on Monday (ISO weeks) and "every day" at midnight.</li>
+                            <li><b>Key</b>: what a claim is locked on. Leave it empty on a new row and one is generated when you save. Allowed: letters, numbers, <code>_</code> and <code>-</code> (max 64), unique within this table.</li>
+                        </ul>
+                        <p><b>Changing and adding icons</b><br/>
+                        Icons are image files that belong to the theme, so an admin cannot upload them here: adding one that is not in the list is a small job for a developer (about five minutes, no changes to the Leat module). Hand the steps below to your developer.</p>
+                        <p><i>Change how an existing icon looks</i> (same name, other image):</p>
+                        <ol style="list-style: decimal; margin-left: 20px;">
+                            <li>Put an SVG with the exact name of the icon in your theme: <code>app/design/frontend/&lt;Vendor&gt;/&lt;theme&gt;/Leat_LoyaltyFrontend/web/images/earn-points/&lt;name&gt;.svg</code>, for example <code>instagram.svg</code>. The theme file wins over the one in the module.</li>
+                            <li>Deploy the static content and flush the cache.</li>
+                        </ol>
+                        <p><i>Add a new icon to the dropdown:</i></p>
+                        <ol style="list-style: decimal; margin-left: 20px;">
+                            <li>Create the SVG in the same theme folder, for example <code>pinterest.svg</code> (it has to be in the theme, another module's folder is not searched). The file name is the icon name: lowercase letters, numbers and dashes only (<code>pinterest</code>, <code>gift-box</code>).</li>
+                            <li>Register the name in the <code>etc/di.xml</code> of a custom module (a theme cannot carry a <code>di.xml</code>, any module of your project can):
+<pre style="margin: 8px 0; padding: 8px; background: #f5f5f5; white-space: pre-wrap;">&lt;type name="Leat\Loyalty\Model\EarnPoints\Icons"&gt;
+    &lt;arguments&gt;
+        &lt;argument name="names" xsi:type="array"&gt;
+            &lt;item name="pinterest" xsi:type="string"&gt;pinterest&lt;/item&gt;
+        &lt;/argument&gt;
+    &lt;/arguments&gt;
+&lt;/type&gt;</pre></li>
+                            <li>Flush the cache (and run <code>bin/magento setup:di:compile</code> in production mode). The icon now shows in the Icon dropdown; choose it on a row and save.</li>
+                        </ol>
+                        <p>Requirements for the SVG: <code>viewBox="0 0 24 24"</code> and <code>stroke="currentColor"</code> (or <code>fill="currentColor"</code>) instead of fixed colours, so the icon takes the colour of the card (white on the dark tile); no fixed <code>width</code>/<code>height</code> attributes needed, the widget sizes it. The file is placed in the page as it is, so only use SVG files from a source you trust. Removing a name from <code>di.xml</code> later turns rows that use it into the "generic" icon, nothing else changes.</p>
+                        <p><b>Good to know</b></p>
+                        <ul style="list-style: disc; margin-left: 20px;">
+                            <li><b>Honor system:</b> nothing checks that the customer really did the action (followed, subscribed, ...). Don't configure an earning you don't want to hand out on trust.</li>
+                            <li><b>Changing a row:</b> title, button text, link, icon and points can be changed freely. Customers who already claimed stay locked as long as the <b>key</b> and the <b>repeat</b> stay the same. A new points value only counts for new claims.</li>
+                            <li><b>Making it claimable again:</b> change the key or the repeat. Deleting a row only hides the card: the claims are kept, so adding a row back with the same key restores the lock.</li>
+                            <li><b>Queue:</b> points are credited immediately. When Leat can't be reached they are queued and retried automatically; the customer sees "Completed" either way.</li>
+                            <li><b>Scope:</b> this table is set per store view. A store view that overrides it should use the same keys to share the lock with the default table; with different keys customers can claim again there.</li>
+                        </ul>
+                    ]]></comment>
+                    <frontend_model>Leat\LoyaltyAdminUI\Block\Adminhtml\System\Config\Form\Field\Earnings</frontend_model>
+                    <backend_model>Leat\LoyaltyAdminUI\Model\Config\Backend\Earnings</backend_model>
+                </field>
+            </group>
             <group id="order" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="40">
                 <label>Order Configuration</label>
                 <field id="order_api_comment" translate="label,comment" type="label" showInDefault="1" showInWebsite="1" showInStore="1">

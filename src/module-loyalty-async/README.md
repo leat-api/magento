@@ -93,8 +93,13 @@ All interactions with the Leat API should follow a layered architecture:
 - Contact
   - ContactCreate - Creates new contacts in Leat
   - ContactUpdate - Updates existing contact information
+  - `Contact\Newsletter\Subscribe` / `Unsubscribe` (`newsletter_subscribe` / `newsletter_unsubscribe`) - Sets the
+    contact's Leat subscription types to subscribed or unsubscribed. See [Newsletter sync](#newsletter-sync).
 - Credit
   - Transaction - Records credit transactions
+  - `Contact\Credit\EarnReward` (`earn_reward`) - Credits the fixed points of a claimed earning. Created through
+    `EarnPointsBuilder::addEarnReward()`. Carries a deterministic transaction hash (customer + earning + period), so a
+    retried job is skipped when Leat already has the transaction.
 - Order
   - `Contact\Order\CreateAndProcess` - Submits a full order payload to the Leat Order API
   - `Contact\Order\Return\CreateAndProcess` - Submits a return (credit memo) payload to the Leat Returns API
@@ -121,6 +126,26 @@ All interactions with the Leat API should follow a layered architecture:
   Magento credit memos, including return line items, positive adjustments, return-level discounts, and
   shipping/tax charges. Used by `Cron/Order/ReturnExport`.
 - RewardBuilder - Handles reward operations (redeeming, crediting)
+
+## Newsletter sync
+
+Magento newsletter status is mirrored to Leat subscription types.
+
+- `Observer\Newsletter\SubscriptionUpdate` listens (global scope, `etc/events.xml`) to
+  `newsletter_subscriber_save_commit_after` and `newsletter_subscriber_delete_commit_after` and queues one
+  `newsletter_subscribe` or `newsletter_unsubscribe` request per change.
+- Status mapping: subscribed queues subscribe; unsubscribed, not active and deleted queue unsubscribe. Unconfirmed
+  (double opt-in pending) and guest subscribers (no customer) queue nothing. Customers outside the configured customer
+  group mapping are skipped.
+- **Registration:** Magento saves the subscriber row before `customer_register_success`, so the subscribe event arrives
+  before the Leat contact exists. The observer therefore does not require a contact UUID. The queued job runs after
+  `CreateCustomer` has created the contact; if the contact is still missing, `NoContactException` triggers the usual
+  contact creation retry. Customers who do not tick the newsletter box get no subscriber row and no job.
+- **Which types:** *Stores > Configuration > Leat > Newsletter > Subscription types*
+  (`leat/newsletter/subscription_types`, any scope) selects the Leat subscription types to change. Leave it empty to
+  apply to all types. Options come from `$client->subscriptionTypes->list()` via the first enabled store's connection,
+  so stores connected to different Leat accounts only see the first account's types.
+- The request types only change types whose state differs from the wanted one.
 
 ## Cron Jobs
 

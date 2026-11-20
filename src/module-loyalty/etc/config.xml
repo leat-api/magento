@@ -11,6 +11,13 @@
             <credits>
                 <label>Credits</label>
             </credits>
+            <rewards>
+                <auto_apply_on_redeem>1</auto_apply_on_redeem>
+            </rewards>
+            <earn_points>
+                <widget_heading>Earn points</widget_heading>
+                <completed_label>Completed</completed_label>
+            </earn_points>
             <order>
                 <order_export_enabled>0</order_export_enabled>
                 <include_tax_as_charge>1</include_tax_as_charge>

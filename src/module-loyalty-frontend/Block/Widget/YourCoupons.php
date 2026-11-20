@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Leat\LoyaltyFrontend\Block\Widget;
 
 use Leat\AsyncQueue\Model\Queue\Request\RequestTypePool;
+use Leat\Loyalty\Model\AppliedCouponsManager;
 use Leat\Loyalty\Model\Connector;
 use Leat\Loyalty\Model\ResourceModel\Loyalty\ContactResource;
 use Leat\Loyalty\Model\ResourceModel\Loyalty\RewardResource;
@@ -50,7 +51,8 @@ class YourCoupons extends GenericWidgetBlock
         RequestTypePool $requestTypePool,
         protected RewardResource $rewardResource,
         Context $context,
-        protected \Leat\Loyalty\Model\Config $leatConfig
+        protected \Leat\Loyalty\Model\Config $leatConfig,
+        protected AppliedCouponsManager $appliedCouponsManager
     ) {
         parent::__construct(
             $storeManager,
@@ -109,6 +111,7 @@ class YourCoupons extends GenericWidgetBlock
             $rewards = $this->getCollectableRewards();
 
             // Create a simplified array for JS
+            $appliedCoupons = $this->appliedCouponsManager->getAllAppliedCoupons(true);
             $rewardsData = [];
             foreach ($rewards as $collectableReward) {
                 /** @var PhysicalReward|DigitalReward $reward */
@@ -119,6 +122,7 @@ class YourCoupons extends GenericWidgetBlock
                     'description' => $reward->getDescription(),
                     'expires_at' => $collectableReward->getExpiresAt(),
                     'is_active' => !$collectableReward->hasBeenCollected(),
+                    'is_applied' => in_array($collectableReward->getUuid(), $appliedCoupons, true),
                 ];
 
                 // Add image URL if available

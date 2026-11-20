@@ -5,6 +5,8 @@ namespace Leat\LoyaltyFrontend\Controller\Coupon;
 
 use Leat\Loyalty\Model\AppliedCouponsManager;
 use Leat\Loyalty\Model\Connector;
+use Leat\LoyaltyFrontend\Block\Widget\YourCoupons;
+use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
@@ -26,6 +28,8 @@ class Remove implements HttpPostActionInterface
         protected JsonFactory $jsonFactory,
         protected Connector $leatConnector,
         protected AppliedCouponsManager $appliedCouponsManager,
+        protected CheckoutSession $checkoutSession,
+        protected YourCoupons $yourCoupons,
     ) {
     }
 
@@ -45,13 +49,18 @@ class Remove implements HttpPostActionInterface
                 throw new LocalizedException(__('Missing reward ID parameter'));
             }
 
-            // Remove the coupon from the customer's account
+            // Gift rewards remove quote rows; the cart page needs a reload to render that
+            $itemCountBefore = count($this->checkoutSession->getQuote()->getAllItems());
             $this->appliedCouponsManager->removeCoupon($rewardId);
+            $itemCountAfter = count($this->checkoutSession->getQuote()->getAllItems());
 
             return $resultJson->setData([
                 'success' => true,
                 'message' => __('Voucher successfully removed from your cart.'),
-                'reward_id' => $rewardId
+                'reward_id' => $rewardId,
+                'is_quote_items_changed' => $itemCountBefore !== $itemCountAfter,
+                // Saves the client a follow-up request for the refreshed voucher list
+                'coupons' => $this->getCoupons(),
             ]);
         } catch (LocalizedException $e) {
             $this->leatConnector->getLogger(self::LOGGER_PURPOSE)->log(
@@ -71,6 +80,20 @@ class Remove implements HttpPostActionInterface
                 'success' => false,
                 'message' => __('An unexpected error occurred while removing the voucher.')
             ]);
+        }
+    }
+
+    /**
+     * Refreshed voucher list; a failure here must not fail the apply/remove itself
+     *
+     * @return array|null
+     */
+    protected function getCoupons(): ?array
+    {
+        try {
+            return json_decode($this->yourCoupons->getCollectableRewardsJson(), true) ?: [];
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 }
