@@ -51,3 +51,19 @@
 .leat-config-banner-message p {
     margin: 5px 0 0;
 }
+
+/* Free gift items of a voucher: label instead of edit/remove, fixed quantity */
+.leat-gift-label,
+.leat-gift-label-minicart {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: #e8f5e9;
+    color: #1b5e20;
+    font-size: 1.2rem;
+}
+
+input.leat-gift-qty {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}

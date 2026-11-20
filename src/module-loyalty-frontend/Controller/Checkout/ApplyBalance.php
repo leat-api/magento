@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Leat\LoyaltyFrontend\Controller\Checkout;
 
+use Leat\Loyalty\Api\BalanceValidatorInterface;
 use Leat\Loyalty\Model\Config;
 use Leat\Loyalty\Model\Connector;
 use Leat\Loyalty\Model\Order\LeatBalanceRepository;
@@ -41,7 +42,8 @@ class ApplyBalance implements HttpPostActionInterface
         private readonly CartRepositoryInterface $quoteRepository,
         private readonly CartTotalRepositoryInterface $cartTotalRepository,
         private readonly Config $config,
-        private readonly Connector $leatConnector
+        private readonly Connector $leatConnector,
+        private readonly BalanceValidatorInterface $balanceValidator
     ) {
     }
 
@@ -76,6 +78,13 @@ class ApplyBalance implements HttpPostActionInterface
             $quote = $this->getQuote();
             if (!$quote->getCustomerId()) {
                 throw new LocalizedException(__('Customer is not logged in.'));
+            }
+
+            // Same server-side check as the REST endpoint: the amount must be within the customer's balance
+            if (!$this->balanceValidator->isValid($quote, $balanceAmount)) {
+                throw new LocalizedException(
+                    __($this->balanceValidator->getErrorMessage() ?: 'Invalid balance amount.')
+                );
             }
 
             // Set balance amount on quote

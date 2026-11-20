@@ -24,9 +24,12 @@
                 <!-- Contact -->
                 <item name="contact_create" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\ContactCreate</item>
                 <item name="contact_update" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\ContactUpdate</item>
+                <item name="newsletter_subscribe" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\Newsletter\Subscribe</item>
+                <item name="newsletter_unsubscribe" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\Newsletter\Unsubscribe</item>
 
                 <!-- Transaction -->
                 <item name="order_item_transaction" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\Order\Balance\Transaction\OrderItemTransaction</item>
+                <item name="earn_reward" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\Credit\EarnReward</item>
 
                 <!-- Order API -->
                 <item name="create_and_process" xsi:type="object">Leat\LoyaltyAsync\Model\Queue\Type\Contact\Order\CreateAndProcess</item>

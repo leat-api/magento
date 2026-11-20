@@ -30,6 +30,8 @@ define([
             this.hasPreloadedData = ko.observable(false);
             this.coupons = ko.observableArray([]);
             this.isReloading = ko.observable(false); // Flag to prevent multiple simultaneous reloads
+            this.pendingToggles = 0; // Apply/remove requests still in flight
+            this.settleState = null; // Latest result of the in-flight burst
 
             // Handle prefetched data
             try {
@@ -62,7 +64,13 @@ define([
             var leatData = customerData.get('leat');
 
             leatData.subscribe(function (updatedData) {
-                if (updatedData && updatedData.hasContact && !this.isReloading()) {
+                if (this.ownChange) {
+                    // Our own apply/remove already returned the fresh list
+                    this.ownChange = false;
+                    return;
+                }
+
+                if (updatedData && updatedData.hasContact) {
                     // Reload rewards when customer data changes to keep in sync
                     this.reloadCoupons();
                 }
@@ -120,9 +128,19 @@ define([
          * Reload coupons from the server
          */
         reloadCoupons: function () {
+            // Coalesce bursts (spam clicks, several section updates) into one trailing request
+            clearTimeout(this.reloadTimer);
+            this.reloadTimer = setTimeout(this.doReloadCoupons.bind(this), 300);
+        },
+
+        /**
+         * Fetch the coupons now
+         */
+        doReloadCoupons: function () {
             // Prevent multiple simultaneous reloads
+            // The running request may predate the change that triggered this call, so run once more after it
             if (this.isReloading()) {
-                console.log('Skipping duplicate reloadCoupons call - already in progress');
+                this.reloadQueued = true;
                 return;
             }
 
@@ -144,13 +162,17 @@ define([
                         // Empty state if no valid response
                         this.coupons([]);
                     }
-                    this.isReloading(false);
-                    console.log('Finished loading coupons');
                 }.bind(this),
                 error: function () {
                     // Silent error handling without changing current state
-                    this.isReloading(false);
                     console.error('Error loading coupons');
+                }.bind(this),
+                complete: function () {
+                    this.isReloading(false);
+                    if (this.reloadQueued) {
+                        this.reloadQueued = false;
+                        this.doReloadCoupons();
+                    }
                 }.bind(this)
             });
         },
@@ -220,6 +242,11 @@ define([
                 buttonElement = $('.js-collect-reward[data-reward-id="' + reward.id + '"]');
             }
 
+            // A request for this button is already running (also guards against duplicate click handlers)
+            if (buttonElement.prop('disabled')) {
+                return;
+            }
+
             // Check if the button is already toggled (has "toggled" class or data attribute)
             const isToggled = buttonElement.hasClass('toggled') || buttonElement.data('is-toggled');
 
@@ -250,6 +277,8 @@ define([
                     reward_id: reward.id
                 },
                 showLoader: false, // No need for default loader since we have progress button
+                // Keeps Magento from reloading the sections after every POST; settleToggles() does it once
+                global: false,
                 success: function(response) {
                     if (response.success) {
                         // Complete with success state and toggle the button
@@ -269,11 +298,16 @@ define([
                             this.showSuccessMessage(successMessage);
                         }
 
-                        // Refresh customer data sections
-                        customerData.reload(['leat', 'cart']);
+                        // Requests run one after another (session lock), so the latest response is the final state
+                        this.settleState = this.settleState || {};
+                        this.settleState.coupons = response.coupons || this.settleState.coupons;
+                        this.settleState.itemsChanged = this.settleState.itemsChanged || response.is_quote_items_changed;
 
-                        // Don't need an explicit reloadCoupons call here
-                        // The customerData subscription will handle it
+                        // A voucher bumped out by a higher priority one
+                        (response.rejected || []).forEach(function (rejected) {
+                            this.showErrorMessage(rejected.message);
+                        }.bind(this));
+
                     } else {
                         // Complete with error state (won't toggle)
                         progress.complete(false, {
@@ -304,7 +338,77 @@ define([
                     }
 
                     this.showErrorMessage(errorMessage);
+                }.bind(this),
+                complete: function () {
+                    this.pendingToggles--;
+                    this.settleToggles();
                 }.bind(this)
+            });
+            this.pendingToggles++;
+        },
+
+        /**
+         * Once the last apply/remove has finished: one section reload and one totals refresh for the whole burst
+         */
+        settleToggles: function () {
+            var state = this.settleState;
+
+            if (this.pendingToggles > 0 || !state) {
+                return;
+            }
+
+            this.settleState = null;
+
+            if (state.coupons) {
+                // The response already carries the fresh list, skip the refetch the leat update would trigger
+                this.ownChange = true;
+                this.coupons(state.coupons);
+            }
+
+            // global:false skipped Magento's own reload (sections.xml), so do it here
+            customerData.invalidate(['leat', 'cart']);
+            customerData.reload(['leat', 'cart'], true);
+            this.refreshTotals({is_quote_items_changed: state.itemsChanged});
+        },
+
+        /**
+         * Refresh cart/checkout totals after a voucher change, without a page reload
+         *
+         * Checkout modules load lazily: this widget also renders on the loyalty page, which has no checkoutConfig.
+         *
+         * @param {Object} response
+         */
+        refreshTotals: function (response) {
+            var onCartPage = $('body').hasClass('checkout-cart-index');
+
+            // Gift rewards add or remove item rows, which only the server renders
+            if (onCartPage && response.is_quote_items_changed) {
+                window.location.reload();
+                return;
+            }
+
+            if (!window.checkoutConfig) {
+                return;
+            }
+
+            if (onCartPage) {
+                require(['Magento_Checkout/js/action/get-totals'], function (getTotalsAction) {
+                    getTotalsAction([], $.Deferred());
+                });
+                return;
+            }
+
+            require([
+                'Magento_Checkout/js/action/get-payment-information',
+                'Magento_Checkout/js/model/totals'
+            ], function (getPaymentInformationAction, totals) {
+                var deferred = $.Deferred();
+
+                totals.isLoading(true);
+                getPaymentInformationAction(deferred);
+                $.when(deferred).always(function () {
+                    totals.isLoading(false);
+                });
             });
         },
 

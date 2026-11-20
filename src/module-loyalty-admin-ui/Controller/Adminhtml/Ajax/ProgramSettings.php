@@ -15,6 +15,11 @@ use Piggy\Api\Exceptions\LoyaltyRequestException;
 class ProgramSettings extends Action
 {
     /**
+     * Authorization level: writes Leat configuration, so it needs the same ACL as the config section
+     */
+    const ADMIN_RESOURCE = 'Leat_Loyalty::config';
+
+    /**
      * @param Context $context
      * @param Connector $connector
      * @param StoreManagerInterface $storeManager

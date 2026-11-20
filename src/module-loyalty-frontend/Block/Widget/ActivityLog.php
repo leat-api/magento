@@ -219,6 +219,13 @@ class ActivityLog extends GenericWidgetBlock
                         return (string) __('Lucky~ %1 granted via Loyalty Dashboard', $this->getCreditName());
                     }
 
+                    // Credits with a note say what they were for, for example the title of an earn points card
+                    $attributes = method_exists($transaction, 'getAttributes') ? $transaction->getAttributes() : [];
+                    $note = trim((string) ($attributes['transaction_note'] ?? ''));
+                    if ($note !== '') {
+                        return $note;
+                    }
+
                     return (string) __('Credit Reception');
                 default:
                     return (string) __('%1 Transaction', $this->getCreditName());

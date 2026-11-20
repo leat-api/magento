@@ -14,6 +14,14 @@
                 type="Leat\LoyaltyFrontend\Plugin\Giftcard\HideGiftcardEdit"/>
     </type>
     
+    <!-- Label voucher gifts and lock their edit/remove actions -->
+    <type name="Magento\Checkout\Block\Cart\Item\Renderer\Actions">
+        <plugin name="leat_gift_item_label_cart" type="Leat\LoyaltyFrontend\Plugin\Cart\GiftItemLabel"/>
+    </type>
+    <type name="Magento\Checkout\CustomerData\ItemPool">
+        <plugin name="leat_gift_item_label_minicart" type="Leat\LoyaltyFrontend\Plugin\Cart\GiftItemLabel"/>
+    </type>
+
     <!-- Plugin to add giftcard options to the customer data for mini cart display -->
     <type name="Magento\Checkout\CustomerData\ItemPool">
         <plugin name="leat_giftcard_item_data"

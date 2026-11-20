@@ -1,0 +1,9 @@
+<div class="amount price-container">
+    <span class="price-wrapper" data-bind="html: cart().subtotal"></span>
+</div>
+<!-- ko if: cart().leat_discount -->
+<div class="amount price-container leat-minicart-discount">
+    <span class="label" data-bind="i18n: 'Discount'"></span>:
+    <span class="price-wrapper">-<!-- ko text: cart().leat_discount --><!-- /ko --></span>
+</div>
+<!-- /ko -->

@@ -4,10 +4,11 @@
     <!-- Invalidate Leat section when a reward is redeemed -->
     <action name="leat/reward/redeem">
         <section name="leat"/>
+        <section name="cart"/>
     </action>
 
-    <!-- Invalidate Leat section when collectible rewards are requested -->
-    <action name="leat/reward/collectiblerewards">
+    <!-- Invalidate Leat section (balance, activity log) when earn points are claimed -->
+    <action name="leat/earnpoints/claim">
         <section name="leat"/>
     </action>
 
@@ -21,6 +22,17 @@
     <action name="leat/coupon/remove">
         <section name="leat"/>
         <section name="cart"/>
+    </action>
+
+    <!-- Removing a gift line or emptying the cart unapplies vouchers, which changes the Leat voucher list -->
+    <action name="checkout/cart/delete">
+        <section name="leat"/>
+    </action>
+    <action name="checkout/cart/updatePost">
+        <section name="leat"/>
+    </action>
+    <action name="checkout/sidebar/removeItem">
+        <section name="leat"/>
     </action>
 
     <action name="rest/*/V1/carts/*/payment-information">

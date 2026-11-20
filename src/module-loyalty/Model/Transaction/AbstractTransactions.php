@@ -92,7 +92,7 @@ abstract class AbstractTransactions
             }
         }
 
-        return is_callable($callback) ? $callback($pageTransactions) : $pageTransactions;
+        return is_callable($callback) ? $callback($transactions) : $transactions;
     }
 
     /**

@@ -1,0 +1,8 @@
+<!-- ko foreach: getLines() -->
+<tr class="totals leat-voucher">
+    <th class="mark" scope="row" data-bind="text: label"></th>
+    <td class="amount">
+        <span class="price" data-bind="text: $parent.getFormattedAmount($data)"></span>
+    </td>
+</tr>
+<!-- /ko -->

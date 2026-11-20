@@ -79,4 +79,44 @@ class ExtensionAttributes extends AbstractModel
     {
         return $this->setData('gift_skus', $skus);
     }
+
+    /**
+     * Is the rule combinable with other Leat vouchers
+     *
+     * @return bool
+     */
+    public function getLeatCombinable(): bool
+    {
+        return (bool)$this->getData('leat_combinable');
+    }
+
+    /**
+     * Max vouchers of this reward on one cart (at least 1)
+     *
+     * @return int
+     */
+    public function getLeatMaxApplied(): int
+    {
+        return max(1, (int)$this->getData('leat_max_applied'));
+    }
+
+    /**
+     * @param int $max
+     * @return $this
+     */
+    public function setLeatMaxApplied(int $max): self
+    {
+        return $this->setData('leat_max_applied', max(1, $max));
+    }
+
+    /**
+     * Set combinable with other Leat vouchers
+     *
+     * @param bool $combinable
+     * @return $this
+     */
+    public function setLeatCombinable(bool $combinable): self
+    {
+        return $this->setData('leat_combinable', (int)$combinable);
+    }
 }

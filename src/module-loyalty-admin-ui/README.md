@@ -93,6 +93,12 @@ notice during active execution, and either a timestamped success or error messag
 - Works seamlessly with Magento's validation system
 - Handles both new rule creation and existing rule editing
 
+#### Voucher Combination Fields
+- Adds "Combinable with other Leat vouchers" (`leat_combinable`) and "Max vouchers of this reward on one cart"
+  (`leat_max_applied`) to the cart price rule form, stored in the same extension table
+- See the Leat_Loyalty README for how vouchers are combined
+- The "Reward" condition dropdown labels each reward with the scope(s) it is configured in (Global, Website, Store View)
+
 #### Extension-Friendly Implementation
 - Uses non-invasive JavaScript to enhance the sales rule form
 - Compatible with other extensions that customize the same form

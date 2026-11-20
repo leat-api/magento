@@ -55,9 +55,10 @@ $hasRewards = !empty($rewards);
                                 </div>
                                 <?php endif; ?>
                                 <div class="leat-coupon-actions">
-                                    <button type="button" class="leat-coupon-collect js-collect-reward"
+                                    <button type="button"
+                                            class="leat-coupon-collect js-collect-reward<?= !empty($reward['is_applied']) ? ' toggled' : '' ?>"
                                             data-reward-id="<?= $block->escapeHtmlAttr($reward['id']) ?>">
-                                        <?= $block->escapeHtml(__('Apply Voucher')) ?>
+                                        <?= $block->escapeHtml(!empty($reward['is_applied']) ? __('Remove from Cart') : __('Apply Voucher')) ?>
                                     </button>
                                 </div>
                             </div>
@@ -103,9 +104,9 @@ $hasRewards = !empty($rewards);
                         </div>
                         <!-- /ko -->
                         <div class="leat-coupon-actions">
+                            <?php /* No click binding: the delegated .js-collect-reward handler covers these buttons, a second handler fired every request twice */ ?>
                             <button type="button" class="leat-coupon-collect js-collect-reward"
-                                    data-bind="click: function(data, event) { $parent.collectReward($data, null, event); },
-                                               css: { 'toggled': typeof is_applied !== 'undefined' && is_applied },
+                                    data-bind="css: { 'toggled': typeof is_applied !== 'undefined' && is_applied },
                                                attr: { 'data-reward-id': id }">
                                 <!-- ko if: typeof is_applied !== 'undefined' && is_applied -->
                                 <?= $block->escapeHtml(__('Remove from Cart')) ?>
