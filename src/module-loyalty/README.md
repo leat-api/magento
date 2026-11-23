@@ -1,4 +1,4 @@
-# Leat_Loyalty module
+/# Leat_Loyalty module
 
 This module allows for the integration of the Piggy.eu loyalty software into Magento.
 It does this by:
@@ -175,6 +175,78 @@ The module allows customers to apply rewards as coupons to their shopping cart. 
 - Dispatches events for other modules to hook into the coupon workflow
 - Provides proper error handling and logging
 
+### Multiple Leat vouchers
+
+A customer can stack several Leat vouchers on one order. Whether a voucher stacks depends on the cart price rule
+mapped to its reward:
+
+- **Combinable with other Leat vouchers** (toggle under *Actions* on the cart price rule, default *No*). Any number
+  of combinable vouchers can sit on a quote, plus at most **one** non-combinable voucher.
+- **Priority** comes from the rule's *Priority* (`sort_order`) field. When a second non-combinable voucher is applied,
+  the rule with the lowest `sort_order` wins; the other voucher is removed from the cart with the message
+  *"Combining this voucher with others is not allowed. Voucher %1 has been prioritized."*. On equal priority the
+  voucher that was already applied stays.
+- The same reward can be applied once per cart (*"This reward is already applied to your cart."*).
+- A reward without a mapped cart price rule cannot be applied, and a physical reward without one cannot be redeemed
+  (checked before any points are spent).
+- **A voucher that gives nothing never stays on the cart.** After a voucher is applied the totals are collected and
+  the rule must have done something: a discount, a gift item or free shipping (`AppliedCouponsManager::hasEffect()`).
+  If not, the cart is restored to its previous vouchers and the customer gets a message, either *"This voucher has no
+  effect on your order: it cannot be combined with your other voucher or your order does not meet its conditions."* or,
+  when it was the only voucher, *"...your order does not meet its conditions."*. Typical causes are *Discard subsequent
+  rules* on a higher priority rule, unmet rule conditions or an inactive rule. The `leat_coupon_applied` and
+  `leat_coupon_removed` events are dispatched only once the voucher is confirmed, so a rollback fires none of them.
+- **Safeguard at order placement:** a voucher whose rule had no effect on the order is not marked as used in Leat
+  (`markCouponsAsCollected()`), so the customer keeps the reward and points. The order gets a status history comment
+  and the voucher is left out of the order's `leat_loyalty_applied_coupons`.
+- **Set "Discard subsequent rules" to No on every combinable rule.** Magento stops evaluating lower priority rules
+  after a rule with *Discard subsequent rules = Yes*, so a second voucher would give no discount. Such a voucher is
+  refused with the message above. This is Magento behaviour and cannot be fixed in the module.
+
+`ResetDiscountArraysPlugin` clears the per rule discount arrays on the quote (`discount_amount_array` etc.) before every
+real totals collect. Without it `ProcessDiscount` would keep adding to amounts of earlier collects and the check above
+could not tell whether a voucher gave a discount.
+
+The name customers see (totals row, *prioritized* message) is the rule's **Label** (Labels tab, store specific before
+the default). Without a label the totals row reads *Leat voucher* and the message falls back to the rule name. Inactive
+rules never block other vouchers.
+
+Cart and checkout show one totals row per applied voucher, built from
+`totals.extension_attributes.leat_voucher_breakdown` (`CartTotalRepositoryPlugin`). Totals refresh right after a
+voucher is applied or removed.
+
+**Apply on redeem** (`Stores > Configuration > Leat Loyalty > Configuration > Rewards > Apply reward to cart on
+redeem`, default *Yes*) applies a reward to the cart straight after the customer redeems it, so the customer doesn't
+have to click *Apply Voucher* once the voucher shows up. If the apply fails, the redeem still succeeds and the apply
+error is appended to the message. A voucher pushed out by the new one (non-combinable priority) is named in the message.
+A redeem without enough points is stopped in the browser before calling Leat, with a clear message.
+Before anything is redeemed, a physical reward must have a cart price rule linked to it (reward UUID on the rule).
+If not, the redeem is refused with *"This reward cannot be redeemed at the moment, no points have been spent."*, so
+points are never spent on a voucher that could not give anything. Digital rewards need no rule.
+
+**Max vouchers of this reward** (`leat_max_applied`, cart price rule, default 1): how many vouchers of one reward can
+sit on a cart. A newer voucher of the reward replaces the oldest beyond the maximum. `AppliedVoucherCounter` tells the
+rule actions how many vouchers of the reward are applied, because a rule is only evaluated once:
+- *Fixed amount* rules (`cart_fixed`, `by_fixed`) are scaled by that number (`ScaleFixedDiscountPlugin`), so three
+  vouchers give three discounts. Percentage rules are left alone: three 10% vouchers do not become 30%.
+- *Gift* rules add the gift once per voucher (see below).
+
+**Voucher gift lines:** every applied voucher owns its gift line(s), keyed by the voucher's loyalty transaction UUID in
+the buy request (`GiftProductManager::BUYREQUEST_VOUCHER_UUID`). Two vouchers never merge into one line (see
+`PreventGiftcardMergePlugin` and `CompareOptionsPlugin`) and removing a voucher removes exactly its gift. Lines of a
+voucher that is gone, and lines without voucher UUID, are removed and re-added when still due. Gift lines cannot be
+edited and their quantity is fixed (`ProtectGiftItemsPlugin`). Removing a gift line unapplies its voucher, and emptying
+the cart unapplies all vouchers (cart page, minicart, REST and GraphQL).
+
+**Checks at order placement:**
+- `CheckVouchersBeforeQuoteSubmit` checks every applied voucher against the customer's collectable vouchers again,
+  because a voucher is only marked as used after the order is placed. A voucher used in the meantime (another cart or
+  session) stops the order, and so does a failed check (fail closed).
+- If a voucher cannot be marked as used after the order is placed, or had no effect, the order gets a status history
+  comment instead.
+- The prepaid balance amount is validated against the customer's balance when applied and again at order placement;
+  an invalid amount stops the order.
+
 ## Gift Product Cart Price Rule
 
 The module adds a new cart price rule action type that allows automatically adding gift products to the cart when a promotion rule is applied.
@@ -232,3 +304,87 @@ The module adds a new cart price rule action type that allows automatically addi
 - Enforces quantity limits per rule using discount_qty
 - Includes detailed logging for troubleshooting
 - Prevents duplicate gift additions on cart updates
+
+## Earn Points
+
+Points that aren't earned through an order (follow on Instagram, add a birthday, ...). Configured under
+**Stores > Configuration > Leat Loyalty > Configuration > Earn Points** (store view scope) as full-width dynamic rows:
+icon, title, button text, button link, points, repeat and key.
+
+- **Honor system:** customers claim the points by pressing the button; nothing verifies the action. Don't configure an
+  earning you don't want to hand out on trust.
+- **0 points:** the card is a plain link. No claim request, no "Completed" state, no points line.
+- **Repeat:** `once`, `yearly`, `monthly`, `weekly` or `daily`. Resets on calendar boundaries in the store timezone
+  (yearly resets on 1 January, weekly on the ISO week). `Model\EarnPoints\Repeat::periodKey()` turns it into the
+  period of a claim (`once`, `2026`, `2026-11`, `2026-W47`, `2026-11-18`).
+- **Claim table:** `leat_loyalty_earning_claim` has a unique key on `(customer_id, earning_id, period_key)`. Inserting
+  the row (`ResourceModel\EarnClaim::claim()`) is the lock: a double-click or a second tab loses the race and gets
+  "already claimed". The row is committed before the credit is queued, and it stays when queueing fails (the failure is
+  logged to the `earn_points` log).
+- **Credit right away:** after the claim the controller runs the queued job immediately (`JobDigest::setJob()`), so the
+  balance and activity log are current when the XHR returns (the `leat/earnpoints/claim` action invalidates the `leat`
+  customer-data section). The queue is only the fallback: when Leat fails, or an earlier job of the customer is still
+  pending, the job stays queued and the cron credits it later; the customer already sees "Completed".
+- **Key:** the key of a row is what a claim is locked on (`earning_id` in the claim table). It is filled with the row id
+  on the first save when left empty, and stays editable: letters, numbers, `_` and `-`, max 64, unique within the table.
+  Change the title, button text, link or points freely and customers who already claimed stay locked. Changing a key
+  (or the repeat) makes the earning claimable again. Rows saved before keys existed use their row id as key. A store
+  view that overrides the whole table can reuse the same keys to share the lock; without that it starts with its own.
+- **Activity log:** every credit is sent to Leat with a `transaction_note` attribute holding the card's title at the time
+  of the claim (plus the `transaction_hash`). The activity log shows that note as the line text; credits without a note
+  keep the generic "Credit Reception". The note is also visible on the transaction in Leat. Renaming a card later
+  doesn't change earlier lines.
+- **Icons:** see [Earn points icons](#earn-points-icons).
+
+### Earn points icons
+
+An icon is an SVG file in `Leat_LoyaltyFrontend/view/frontend/web/images/earn-points/<name>.svg`. The widget inlines the
+file (so `currentColor` follows the card's text colour) and finds it through the normal theme fallback:
+
+1. `<theme>/Leat_LoyaltyFrontend/web/images/earn-points/<name>.svg` (and parent themes)
+2. `Leat_LoyaltyFrontend/view/frontend/web/images/earn-points/<name>.svg`
+
+The names in the admin dropdown come from `Leat\Loyalty\Model\EarnPoints\Icons`: the built-in icons plus whatever is
+registered through `di.xml`. Built-in: `cart`, `birthday`, `gift`, `heart`, `review`, `share`, `newsletter`, `generic`
+(general) and `instagram`, `facebook`, `x`, `tiktok`, `youtube`, `pinterest`, `linkedin`, `whatsapp`, `snapchat`,
+`twitch`, `telegram`, `spotify` (social media). A row that points to a
+name that is no longer registered shows the `generic` icon.
+
+**Admin:** an admin can only pick from the list; the files belong to the theme, so changing or adding an icon is a
+developer task. The "Earnings" field in the admin explains the steps, so it can be handed over as is.
+
+**Developer: change an existing icon.** Put an SVG with the same name in the theme (path above), deploy static content
+and flush the cache. Nothing else is needed, `<name>` is the icon name.
+
+**Developer: add a new icon.** No change to the Leat modules is needed, so it keeps working when they are installed
+through vendor:
+
+1. Add `pinterest.svg` to your theme: `<theme>/Leat_LoyaltyFrontend/web/images/earn-points/pinterest.svg`. The file
+   has to live in a theme (or the Leat_LoyaltyFrontend module itself): icons are looked up as
+   `Leat_LoyaltyFrontend::images/earn-points/<name>.svg`, so another module's `web/` folder is not searched. The name is
+   lowercase letters, digits and dashes (`pinterest`, `gift-box`); anything else is ignored because the name ends up in
+   a file path.
+2. Register the name in the `etc/di.xml` of a custom module (a theme can't carry a `di.xml`, any module of your
+   project can, for example the one that holds your other customisations):
+
+   ```xml
+   <type name="Leat\Loyalty\Model\EarnPoints\Icons">
+       <arguments>
+           <argument name="names" xsi:type="array">
+               <item name="pinterest" xsi:type="string">pinterest</item>
+           </argument>
+       </arguments>
+   </type>
+   ```
+
+   The item key only needs to be unique (it lets another module remove or replace the entry); the value is the icon name.
+3. Flush the cache, run `bin/magento setup:di:compile` in production mode and deploy static content. The icon appears in
+   the Icon dropdown of the Earn Points rows (label: the name with the first letter capitalised and dashes as spaces).
+
+**SVG requirements:** `viewBox="0 0 24 24"`; `stroke="currentColor"` or `fill="currentColor"` instead of fixed colours
+(the icon sits white on a dark tile); no scripts. The widget sets the size (`.leat-earn-points-icon svg`), so
+`width`/`height` attributes don't matter. The file is output unescaped, so only use files from a trusted source.
+
+**Troubleshooting:** icon missing in the dropdown: `di.xml` not picked up (flush cache / recompile) or an invalid name.
+Dropdown shows it but the card shows the generic icon: the SVG isn't found at the expected path, check the file name
+(exact, lowercase) and the theme fallback; static content may need redeploying in production mode.

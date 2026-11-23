@@ -4,6 +4,8 @@
     <type name="Magento\Checkout\CustomerData\Cart">
         <plugin name="leat_loyalty_minicart_credit_calculation"
                 type="Leat\LoyaltyFrontend\Plugin\Minicart\AddCreditsCount"/>
+        <plugin name="leat_loyalty_minicart_discount"
+                type="Leat\LoyaltyFrontend\Plugin\Minicart\AddDiscount"/>
     </type>
 
     <type name="Magento\Customer\CustomerData\SectionPoolInterface">

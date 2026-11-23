@@ -26,7 +26,9 @@
         "column": {
             "leat_loyalty_balance_amount": true,
             "leat_loyalty_balance_refunded": true,
-            "leat_loyalty_giftcard_refunded": true
+            "leat_loyalty_giftcard_refunded": true,
+            "exported_to_leat": true,
+            "exported_to_leat_at": true
         }
     },
     "leat_loyalty_salesrule_extension": {
@@ -34,7 +36,9 @@
             "entity_id": true,
             "rule_id": true,
             "reward_uuid": true,
-            "gift_skus": true
+            "gift_skus": true,
+            "leat_combinable": true,
+            "leat_max_applied": true
         },
         "index": {
             "LEAT_LOYALTY_SALESRULE_EXTENSION_REWARD_UUID": true
@@ -90,6 +94,21 @@
             "giftcard_exported_to_leat": true,
             "giftcard_exported_to_leat_at": true,
             "leat_giftcard_object_uuid": true
+        }
+    },
+    "leat_loyalty_earning_claim": {
+        "column": {
+            "claim_id": true,
+            "customer_id": true,
+            "earning_id": true,
+            "period_key": true,
+            "points": true,
+            "claimed_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "LEAT_LOYALTY_EARNING_CLAIM_CUSTOMER_ID_EARNING_ID_PERIOD_KEY": true,
+            "LEAT_LOYALTY_EARNING_CLAIM_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true
         }
     }
 }

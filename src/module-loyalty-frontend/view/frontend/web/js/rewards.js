@@ -24,6 +24,9 @@ define([
                 this.redeemUrl = window.LeatConfig.redeemUrl;
             }
 
+            this.pendingRedeems = 0; // Redeem requests still in flight
+            this.needsReload = false; // A redeem in the current burst succeeded
+
             this.initEventHandlers();
             return this;
         },
@@ -48,6 +51,14 @@ define([
                 return;
             }
 
+            // Saves a round trip to Leat; the API is still the real check
+            const requiredCredits = parseInt(button.data('required-credits'), 10);
+            const points = Number((customerData.get('leat')() || {}).points);
+            if (!isNaN(requiredCredits) && !isNaN(points) && points < requiredCredits) {
+                this.showErrorMessage($t('You don\'t have enough points to redeem this reward.'));
+                return;
+            }
+
             // Initialize progress button with all text states
             const progress = progressButton.init(button, {
                 initialText: $t('Redeem'),
@@ -55,6 +66,7 @@ define([
                 successText: $t('Redeemed!')
             });
 
+            this.pendingRedeems++;
             this.redeemReward(rewardId)
                 .done(function (response) {
                     if (response.success) {
@@ -63,16 +75,9 @@ define([
                             resetDelay: 3000
                         });
 
-                        this.showSuccessMessage($t('Reward successfully redeemed!'));
+                        this.showSuccessMessage(response.message || $t('Reward successfully redeemed!'));
 
-                        // Refresh the Leat customer data section to update the points balance
-                        try {
-                            customerData.invalidate(['leat']);
-                            customerData.reload(['leat'], true);
-                            console.log('Leat points data refreshed');
-                        } catch (e) {
-                            console.error('Error refreshing Leat points data', e);
-                        }
+                        this.needsReload = true;
                     } else {
                         // Complete with error state
                         progress.complete(false);
@@ -83,7 +88,27 @@ define([
                     // Reset on failure
                     progress.reset();
                     this.showErrorMessage($t('An error occurred while redeeming your reward.'));
+                }.bind(this))
+                // Last, so done() has already recorded its success
+                .always(function () {
+                    this.pendingRedeems--;
+                    this.settleRedeems();
                 }.bind(this));
+        },
+
+        /**
+         * Once the last redeem has finished: one leat/cart reload for the whole burst
+         *
+         * The leat update also refreshes the voucher list (your-coupons.js subscribes to it)
+         */
+        settleRedeems: function () {
+            if (this.pendingRedeems > 0 || !this.needsReload) {
+                return;
+            }
+
+            this.needsReload = false;
+            customerData.invalidate(['leat', 'cart']);
+            customerData.reload(['leat', 'cart'], true);
         },
 
         /**
@@ -97,6 +122,8 @@ define([
                 url: this.redeemUrl,
                 type: 'POST',
                 dataType: 'json',
+                // Keeps Magento from reloading the sections after every POST; settleRedeems() does it once
+                global: false,
                 data: {
                     reward_id: rewardId,
                     form_key: $.mage.cookies.get('form_key')

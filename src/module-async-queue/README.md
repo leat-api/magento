@@ -225,7 +225,10 @@ class CustomerCreate implements TypeInterface
 
 - The queue processes a configurable number of jobs per execution
 - Jobs are prioritized by creation time
-- Database-level locking prevents duplicate processing
+- Locking prevents duplicate processing: `ProcessJobs` takes a global lock so a run that outlasts its minute does not
+  overlap with the next one, and `JobDigest` takes a lock per job (Magento lock manager, `leat_asyncqueue_job_<id>`).
+  A job that is locked is being handled by another runner (cron or an immediate run) and is skipped; the job is
+  re-checked for completion after the lock is acquired.
 - Heavy processing should be designed to be resumable between job executions
 
 ## Technical Implementation

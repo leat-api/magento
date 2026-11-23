@@ -13,6 +13,11 @@
     <extension_attributes for="Magento\SalesRule\Api\Data\RuleInterface">
         <attribute code="reward_uuid" type="string" />
         <attribute code="gift_skus" type="string" />
+        <attribute code="leat_combinable" type="boolean" />
+        <attribute code="leat_max_applied" type="int" />
+    </extension_attributes>
+    <extension_attributes for="Magento\Quote\Api\Data\TotalsInterface">
+        <attribute code="leat_voucher_breakdown" type="Leat\Loyalty\Api\Data\VoucherBreakdownLineInterface[]" />
     </extension_attributes>
     <extension_attributes for="Magento\Quote\Api\Data\CartItemInterface">
         <attribute code="is_gift" type="boolean" />

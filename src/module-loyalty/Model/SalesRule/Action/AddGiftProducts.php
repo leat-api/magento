@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Leat\Loyalty\Model\SalesRule\Action;
 
 use Leat\Loyalty\Model\Connector;
+use Leat\Loyalty\Model\SalesRule\GiftItemInfo;
 use Leat\Loyalty\Model\SalesRule\GiftProductManager;
+use Leat\Loyalty\Model\Voucher\AppliedVoucherCounter;
 use Magento\Framework\Pricing\PriceCurrencyInterface;
 use Magento\Quote\Model\Quote;
 use Magento\SalesRule\Model\Rule\Action\Discount\AbstractDiscount;
@@ -21,6 +23,8 @@ class AddGiftProducts extends AbstractDiscount
      * @param PriceCurrencyInterface $priceCurrency
      * @param GiftProductManager $giftProductManager
      * @param Connector $leatConnector
+     * @param AppliedVoucherCounter $voucherCounter
+     * @param GiftItemInfo $giftItemInfo
      */
     public function __construct(
         Validator $validator,
@@ -28,6 +32,8 @@ class AddGiftProducts extends AbstractDiscount
         PriceCurrencyInterface $priceCurrency,
         protected GiftProductManager $giftProductManager,
         protected Connector $leatConnector,
+        protected AppliedVoucherCounter $voucherCounter,
+        protected GiftItemInfo $giftItemInfo,
     ) {
         parent::__construct($validator, $discountDataFactory, $priceCurrency);
     }
@@ -108,7 +114,7 @@ class AddGiftProducts extends AbstractDiscount
         $quote->setData($processedKey, true);
 
         // Get the discount amount (percentage) from the rule
-        $discountAmount = (float)$rule->getDiscountAmount();
+        $discountAmount = (float)$rule->getDiscountAmount() ?: 100.0;
 
         // Get discount quantity (max number of gift items allowed)
         // If discount_qty is empty or 0, default to 1
@@ -137,72 +143,68 @@ class AddGiftProducts extends AbstractDiscount
             return;
         }
 
-        // Count existing gift items from this rule
-        $existingGiftCount = 0;
-        $existingGiftItems = [];
+        // Every applied voucher of the reward owns its gift lines. A rule without applied vouchers (not mapped to a
+        // reward) keeps one set of gifts without voucher uuid.
+        $voucherUuids = $this->voucherCounter->uuids($ruleId, $quote) ?: [null];
+
+        // Gift lines of this rule per voucher. Lines of a voucher that is gone, and lines without voucher uuid
+        // (created before per voucher lines), leave the quote and are re-added below when still due.
+        $linesPerVoucher = [];
         foreach ($quote->getAllItems() as $quoteItem) {
-            // Look for existing gifts from this rule
-            $isGiftFromThisRule = false;
-
-            // Check by extension attributes
-            $extensionAttrs = $quoteItem->getExtensionAttributes();
-            if ($extensionAttrs &&
-                $extensionAttrs->getIsGift() &&
-                $extensionAttrs->getGiftRuleId() === $ruleId) {
-                $isGiftFromThisRule = true;
+            // GiftItemInfo, not the extension attributes alone: those are not always loaded on a reloaded quote, and a
+            // gift line that goes unseen here gets added again and merged into a qty 2 line
+            if ($this->giftItemInfo->getGiftRuleId($quoteItem) !== $ruleId) {
+                continue;
             }
 
-            if ($isGiftFromThisRule) {
-                $existingGiftCount++;
-                $existingGiftItems[] = $quoteItem->getSku();
+            $uuid = $this->giftProductManager->getVoucherUuid($quoteItem);
+            if (!in_array($uuid, $voucherUuids, true)) {
+                if ($quoteItem->getId()) {
+                    $quote->removeItem($quoteItem->getId());
+                }
+                continue;
             }
+
+            // One unit per gift line, also heals a line that was merged up earlier
+            if ((float)$quoteItem->getQty() !== 1.0) {
+                $quoteItem->setQty(1);
+            }
+
+            $linesPerVoucher[(string)$uuid] = ($linesPerVoucher[(string)$uuid] ?? 0) + 1;
         }
 
-        $logger->debug(sprintf(
-            'Found %d existing gift items for rule %d in quote %s: %s',
-            $existingGiftCount,
-            $ruleId,
-            $quoteId,
-            implode(', ', $existingGiftItems)
-        ));
-
-        // If we already have the maximum number of gift items, don't add more
-        if ($existingGiftCount >= $discountQty) {
+        foreach ($voucherUuids as $uuid) {
+            $existingGiftCount = $linesPerVoucher[(string)$uuid] ?? 0;
             $logger->debug(sprintf(
-                'Already have %d gift items (max: %d) for rule %d in quote %s, skipping',
+                'Found %d existing gift items for rule %d, voucher %s in quote %s',
                 $existingGiftCount,
-                $discountQty,
                 $ruleId,
-                $quoteId
-            ));
-            return;
-        }
-
-        // Calculate how many more gift items we can add
-        $remainingQty = $discountQty - $existingGiftCount;
-
-        try {
-            $logger->debug(sprintf(
-                'Adding %d more gift items for rule %d to quote %s',
-                $remainingQty,
-                $ruleId,
+                (string)$uuid,
                 $quoteId
             ));
 
-            $this->giftProductManager->addGiftProductsToQuote(
-                $quote,
-                $ruleId,
-                $giftSkus,
-                $remainingQty,
-                $discountAmount
-            );
-        } catch (\Exception $e) {
-            $logger->log(sprintf(
-                'Error adding gift products for rule %d to quote %s: %s',
-                $ruleId,
-                $quoteId,
-                $e->getMessage()
-            ));
+            // If this voucher already has the maximum number of gift items, don't add more
+            if ($existingGiftCount >= $discountQty) {
+                continue;
+            }
+
+            try {
+                $this->giftProductManager->addGiftProductsToQuote(
+                    $quote,
+                    $ruleId,
+                    $giftSkus,
+                    $discountQty - $existingGiftCount,
+                    $discountAmount,
+                    $uuid
+                );
+            } catch (\Exception $e) {
+                $logger->log(sprintf(
+                    'Error adding gift products for rule %d to quote %s: %s',
+                    $ruleId,
+                    $quoteId,
+                    $e->getMessage()
+                ));
+            }
         }
     }
 }

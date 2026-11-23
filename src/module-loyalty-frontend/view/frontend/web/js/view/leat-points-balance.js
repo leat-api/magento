@@ -45,12 +45,6 @@ define([
                 this.hideServerRenderedPoints();
             }
 
-            // Force reload customer data once loaded to ensure it's fresh
-            // Use a slight delay to ensure the page is fully loaded
-            setTimeout(function() {
-                customerData.reload(['leat'], false);
-            }, 500);
-
             return this;
         },
 

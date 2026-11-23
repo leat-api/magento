@@ -4,111 +4,55 @@ declare(strict_types=1);
 
 namespace Leat\Loyalty\Plugin\SalesRule;
 
-use Leat\LoyaltyAdminUI\Plugin\SalesRule\Model\Rule\CouponTypeOptionsPlugin;
 use Leat\Loyalty\Model\SalesRule\ExtensionAttributesRepository;
 use Magento\Framework\Api\ExtensionAttributesFactory;
-use Magento\Framework\Exception\LocalizedException;
 use Magento\SalesRule\Api\Data\RuleInterface;
 use Magento\SalesRule\Api\RuleRepositoryInterface;
 
+/**
+ * Exposes gift_skus, leat_combinable and leat_max_applied as extension attributes on the sales rule repository (REST, and modules
+ * such as Amasty_Rgrid that duplicate rules through the repository).
+ *
+ * Works on extension attributes only: the repository passes Magento\SalesRule\Model\Data\Rule, which has no
+ * getData(). The admin form saves through the Rule model, see Plugin\SalesRule\Model\RuleSavePlugin.
+ */
 class ExtensionAttributesPlugin
 {
-    /**
-     * @var ExtensionAttributesRepository
-     */
-    private $extensionRepository;
-
-    /**
-     * @var ExtensionAttributesFactory
-     */
-    private $extensionFactory;
-
-    /**
-     * @param ExtensionAttributesRepository $extensionRepository
-     * @param ExtensionAttributesFactory $extensionFactory
-     */
     public function __construct(
-        ExtensionAttributesRepository $extensionRepository,
-        ExtensionAttributesFactory $extensionFactory
+        private readonly ExtensionAttributesRepository $extensionRepository,
+        private readonly ExtensionAttributesFactory $extensionFactory
     ) {
-        $this->extensionRepository = $extensionRepository;
-        $this->extensionFactory = $extensionFactory;
     }
 
     /**
-     * Add extension attributes after rule is loaded
-     *
      * @param RuleRepositoryInterface $subject
      * @param RuleInterface $rule
      * @return RuleInterface
      */
-    public function afterGet(
-        RuleRepositoryInterface $subject,
-        RuleInterface $rule
-    ): RuleInterface {
+    public function afterGetById(RuleRepositoryInterface $subject, RuleInterface $rule): RuleInterface
+    {
         $ruleId = (int)$rule->getRuleId();
-
         if (!$ruleId) {
             return $rule;
         }
 
         try {
-            $extensionAttributes = $rule->getExtensionAttributes();
-            if (!$extensionAttributes) {
-                $extensionAttributes = $this->extensionFactory->create(RuleInterface::class);
-            }
-
             $ruleExtension = $this->extensionRepository->getByRuleId($ruleId);
-
-            // Set extension attributes for gift_skus
+            $extensionAttributes = $rule->getExtensionAttributes()
+                ?? $this->extensionFactory->create(RuleInterface::class);
             $extensionAttributes->setGiftSkus($ruleExtension->getGiftSkus());
-
+            $extensionAttributes->setLeatCombinable($ruleExtension->getLeatCombinable());
+            $extensionAttributes->setLeatMaxApplied($ruleExtension->getLeatMaxApplied());
             $rule->setExtensionAttributes($extensionAttributes);
-
-            // Also set the data directly for usage in forms
-            if ($ruleExtension->getGiftSkus()) {
-                $rule->setData('gift_skus', $ruleExtension->getGiftSkus());
-            }
         } catch (\Exception $e) {
-            // Log error but don't break the rule loading
+            // Don't break rule loading
         }
 
         return $rule;
     }
 
     /**
-     * Save extension attributes before rule is saved
-     *
-     * @param RuleRepositoryInterface $subject
-     * @param RuleInterface $rule
-     * @return array
-     * @throws LocalizedException
-     */
-    public function beforeSave(
-        RuleRepositoryInterface $subject,
-        RuleInterface $rule
-    ): array {
-        $extensionAttributes = $rule->getExtensionAttributes();
-        $ruleId = (int)$rule->getRuleId();
-
-        if (method_exists($rule, 'getData')) {
-            $giftSkus =  $rule->getData('gift_skus');
-        }
-        // Get gift_skus data
-        // If extension attributes exist and have gift_skus, they take precedence
-        if ($extensionAttributes && $extensionAttributes->getGiftSkus() !== null) {
-            $giftSkus = $extensionAttributes->getGiftSkus();
-        }
-
-        // We'll save the extension attributes after the rule is saved
-        // Store the value temporarily in the rule object
-        $rule->setData('_tmp_extension_gift_skus', $giftSkus);
-
-        return [$rule];
-    }
-
-    /**
-     * Save extension attributes after rule is saved
+     * Persist the extension attributes given to the repository; values left out (null) are kept as stored
      *
      * @param RuleRepositoryInterface $subject
      * @param RuleInterface $result
@@ -121,39 +65,40 @@ class ExtensionAttributesPlugin
         RuleInterface $rule
     ): RuleInterface {
         $ruleId = (int)$result->getRuleId();
-
-        if (!$ruleId) {
+        $given = $rule->getExtensionAttributes();
+        if (!$ruleId || !$given) {
             return $result;
         }
 
         try {
-            $extensionAttributes = $this->extensionRepository->getByRuleId($ruleId);
-            $extensionAttributes->setRuleId($ruleId);
-
-            // Get the temporarily stored gift_skus value
-            $giftSkus = $rule->getData('_tmp_extension_gift_skus');
-
-            // Set the gift_skus value on extension attributes
-            $extensionAttributes->setGiftSkus($giftSkus);
-
-            // Save the extension attributes
-            $this->extensionRepository->save($extensionAttributes);
-
-            // Update the result with the extension attributes
-            $resultExtensionAttributes = $result->getExtensionAttributes();
-            if (!$resultExtensionAttributes) {
-                $resultExtensionAttributes = $this->extensionFactory->create(RuleInterface::class);
+            $giftSkus = $given->getGiftSkus();
+            $combinable = $given->getLeatCombinable();
+            $maxApplied = $given->getLeatMaxApplied();
+            if ($giftSkus === null && $combinable === null && $maxApplied === null) {
+                return $result;
             }
 
-            $resultExtensionAttributes->setGiftSkus($giftSkus);
-            $result->setExtensionAttributes($resultExtensionAttributes);
-
-            // Also set directly on the model for form handling
+            $ruleExtension = $this->extensionRepository->getByRuleId($ruleId);
+            $ruleExtension->setRuleId($ruleId);
             if ($giftSkus !== null) {
-                $result->setData('gift_skus', $giftSkus);
+                $ruleExtension->setGiftSkus($giftSkus);
             }
+            if ($combinable !== null) {
+                $ruleExtension->setLeatCombinable((bool)$combinable);
+            }
+            if ($maxApplied !== null) {
+                $ruleExtension->setLeatMaxApplied((int)$maxApplied);
+            }
+            $this->extensionRepository->save($ruleExtension);
+
+            $resultExtension = $result->getExtensionAttributes()
+                ?? $this->extensionFactory->create(RuleInterface::class);
+            $resultExtension->setGiftSkus($ruleExtension->getGiftSkus());
+            $resultExtension->setLeatCombinable($ruleExtension->getLeatCombinable());
+            $resultExtension->setLeatMaxApplied($ruleExtension->getLeatMaxApplied());
+            $result->setExtensionAttributes($resultExtension);
         } catch (\Exception $e) {
-            // Log error but don't break the rule saving
+            // Don't break rule saving
         }
 
         return $result;

@@ -47,6 +47,11 @@ class LoyaltyTransactionHash extends LoyaltyTransactionOrderItems
 
             $mappedTransactions = [];
             array_walk($transactions, function ($transaction) use (&$mappedTransactions) {
+                // Not every transaction type has attributes (a reward redemption doesn't)
+                if (!method_exists($transaction, 'getAttributes')) {
+                    return;
+                }
+
                 $transactionHash = $transaction->getAttributes()[Transaction::INTERNAL_TRANSACTION_HASH] ?? '';
                 if (!empty($transactionHash)) {
                     $mappedTransactions[] = $transactionHash;

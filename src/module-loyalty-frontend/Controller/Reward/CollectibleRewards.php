@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Leat\LoyaltyFrontend\Controller\Reward;
 
-use Leat\Loyalty\Model\AppliedCouponsManager;
 use Leat\LoyaltyFrontend\Block\Widget\YourCoupons;
 use Magento\Customer\Model\Session;
 use Magento\Framework\App\Action\HttpGetActionInterface;
@@ -16,7 +15,6 @@ class CollectibleRewards implements HttpGetActionInterface
         protected JsonFactory $resultJsonFactory,
         protected Session $customerSession,
         protected YourCoupons $yourCoupons,
-        protected AppliedCouponsManager $appliedCouponsManager,
     ) {
     }
 
@@ -38,19 +36,10 @@ class CollectibleRewards implements HttpGetActionInterface
         $couponsArray = [];
         $success = false;
         try {
-            // We need to decode the JSON string from the block and pass it directly as an array
+            // The block adds is_applied, same as the server rendered widget
             $couponsJson = $this->yourCoupons->getCollectableRewardsJson();
             $couponsArray = json_decode($couponsJson, true) ?: [];
 
-            // Add 'is_applied' flag to each coupon
-            $appliedCoupons = $this->appliedCouponsManager->getAllAppliedCoupons(true);
-            foreach ($couponsArray as &$coupon) {
-                if (isset($coupon['id']) && in_array($coupon['id'], $appliedCoupons)) {
-                    $coupon['is_applied'] = true;
-                } else {
-                    $coupon['is_applied'] = false;
-                }
-            }
             $success = true;
         } catch (\Throwable $e) {
             $this->yourCoupons->getLogger()->log($e->getMessage());

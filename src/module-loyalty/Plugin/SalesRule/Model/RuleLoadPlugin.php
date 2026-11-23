@@ -65,6 +65,9 @@ class RuleLoadPlugin
             if ($ruleExtension->getGiftSkus()) {
                 $result->setData('gift_skus', $ruleExtension->getGiftSkus());
             }
+            // String on purpose: the admin toggle's valueMap holds "0"/"1" strings and the checkbox compares strictly
+            $result->setData('leat_combinable', (string)(int)$ruleExtension->getLeatCombinable());
+            $result->setData('leat_max_applied', $ruleExtension->getLeatMaxApplied());
         } catch (\Exception $e) {
             // Log error but don't break the rule loading
         }

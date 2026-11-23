@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Leat\Loyalty\Plugin\Quote\Item;
 
 use Leat\Loyalty\Model\ResourceModel\Loyalty\GiftcardResource;
+use Leat\Loyalty\Model\SalesRule\GiftProductManager;
 use Magento\Quote\Model\Quote\Item\Compare;
 
 /**
- * Plugin to prevent merging of giftcard items by altering option comparison
+ * Plugin to prevent merging of giftcard items and voucher gift lines by altering option comparison
  */
 class CompareOptionsPlugin
 {
@@ -30,6 +31,13 @@ class CompareOptionsPlugin
         // If the result is already false, respect that
         if (!$result) {
             return false;
+        }
+
+        // Voucher gift lines only match lines of the same gift rule and the same voucher
+        foreach ([GiftProductManager::BUYREQUEST_GIFT_RULE_ID, GiftProductManager::BUYREQUEST_VOUCHER_UUID] as $key) {
+            if (($this->extractBuyRequest($options1)[$key] ?? null) != ($this->extractBuyRequest($options2)[$key] ?? null)) {
+                return false;
+            }
         }
 
         // Check if the items are giftcards

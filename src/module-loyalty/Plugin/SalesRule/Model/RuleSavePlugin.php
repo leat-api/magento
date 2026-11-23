@@ -6,6 +6,7 @@ namespace Leat\Loyalty\Plugin\SalesRule\Model;
 
 use Leat\Loyalty\Model\SalesRule\ExtensionAttributesRepository;
 use Leat\Loyalty\Model\SalesRule\ExtensionAttributesFactory;
+use Leat\LoyaltyAdminUI\Model\Rule\Condition\Reward;
 use Magento\SalesRule\Model\Rule;
 
 class RuleSavePlugin
@@ -55,10 +56,18 @@ class RuleSavePlugin
             $conditions = $result->getConditions()->asArray();
             $rewardUUID = $this->getConditionsRewardUUID($conditions);
 
-            // Set value on extension attributes
-            $extensionAttributes->setGiftSkus($giftSkus);
+            // Only when given: a repository save (Data\Rule converted to a model) carries no gift_skus
+            if ($result->hasData('gift_skus')) {
+                $extensionAttributes->setGiftSkus($giftSkus);
+            }
             $extensionAttributes->setRewardUUID($rewardUUID);
+            if ($result->getData('leat_combinable') !== null) {
+                $extensionAttributes->setLeatCombinable((bool)$result->getData('leat_combinable'));
+            }
 
+            if ($result->getData('leat_max_applied') !== null) {
+                $extensionAttributes->setLeatMaxApplied((int)$result->getData('leat_max_applied'));
+            }
             $this->extensionRepository->save($extensionAttributes);
         } catch (\Exception $e) {
             // Log or handle the exception
@@ -81,11 +90,11 @@ class RuleSavePlugin
                 return $this->getConditionsRewardUUID($subCondition);
             }
 
-            if ($subCondition['type'] !== \Leat\LoyaltyAdminUI\Model\Rule\Condition\Reward::class) {
+            if ($subCondition['type'] !== Reward::class || empty($subCondition['value'])) {
                 continue;
             }
 
-            $rewardUUID = implode(',', $subCondition['value']);
+            $rewardUUID = implode(',', $subCondition['value'] ?? []);
         }
 
         return $rewardUUID;

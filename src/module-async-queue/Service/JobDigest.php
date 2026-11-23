@@ -14,11 +14,17 @@ use Leat\AsyncQueue\Model\RequestRepository;
 use Leat\AsyncQueue\Model\ResourceModel\Job\Collection as JobCollection;
 use Leat\AsyncQueue\Model\ResourceModel\Job\CollectionFactory as JobCollectionFactory;
 use Magento\Framework\Exception\AuthenticationException;
+use Magento\Framework\Lock\LockManagerInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 
 class JobDigest
 {
     public const string PREVIOUS_RESULT = 'previous_result';
+
+    /**
+     * Prefix of the per job lock name (Magento lock manager)
+     */
+    public const string LOCK_PREFIX = 'leat_asyncqueue_job_';
 
     /**
      * Limit the amount of jobs to be processed at once to prevent memory/timing issues.
@@ -49,7 +55,8 @@ class JobDigest
         protected RequestRepository      $requestRepository,
         protected JobCollectionFactory   $jobCollectionFactory,
         protected DateTime               $dateTime,
-        protected RequestTypePool        $requestTypePool
+        protected RequestTypePool        $requestTypePool,
+        protected LockManagerInterface   $lockManager
     ) {
     }
 
@@ -66,65 +73,96 @@ class JobDigest
      */
     public function execute(): void
     {
-        $typePool = $this->requestTypePool->getRequestTypes();
         /** @var Job $job */
         foreach ($this->getJobs() as $job) {
-            $previousRequestResult = null;
-            $skipValidation = ($job->getSkipValidation() ?? false);
-            if (!$skipValidation && !$this->validateJob($job)) {
+            // One runner per job: the cron and an immediate run (e.g. an earn points claim) must not
+            // execute the same request twice. A job that is locked is being handled by someone else.
+            $lockName = self::LOCK_PREFIX . $job->getJobId();
+            if (!$this->lockManager->lock($lockName, 0)) {
                 continue;
             }
 
-            /** @var Request[] $requests */
-            $requests = $job->getRequestCollection();
-            foreach ($requests as $request) {
-                if ($request->getIsSynced()) {
-                    $previousRequestResult = $request->getResult();
-                    continue;
-                }
+            try {
+                $this->processJob($job);
+            } finally {
+                $this->lockManager->unlock($lockName);
+            }
+        }
+    }
 
-                if (!$skipValidation && !$this->checkRetryLimit($request)) {
-                    continue 2;
-                }
+    /**
+     * Execute the requests of one job. The caller holds the job lock.
+     *
+     * @param Job $job
+     * @return void
+     * @throws AuthenticationException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    protected function processJob(Job $job): void
+    {
+        $typePool = $this->requestTypePool->getRequestTypes();
+        $previousRequestResult = null;
+        $skipValidation = ($job->getSkipValidation() ?? false);
 
-                $exception = null;
-                try {
-                    /** @var TypeInterface $type */
-                    $request->setAttempt(($request->getAttempt() + 1));
-                    $type = $typePool[$request->getTypeCode()];
+        // Another runner may have finished this job between loading it and getting the lock
+        if ($this->jobRepository->get($job->getJobId())->getCompleted()) {
+            return;
+        }
+        $job->getRequestCollection()->clear();
 
-                    $type->unpack([...$request->getPayload(), self::PREVIOUS_RESULT => $previousRequestResult]);
+        if (!$skipValidation && !$this->validateJob($job)) {
+            return;
+        }
 
-                    $type->beforeExecute($job, $request);
-
-                    $request->setIsSynced(true);
-                } catch (\Throwable $exception) {
-                    $this->handleException($job, $request, $exception);
-                } finally {
-                    try {
-                        $this->requestRepository->save($request);
-                    } catch (\Throwable $saveException) {
-                        // Log the save exception
-                        $type->getConnector()->getLogger()->log(
-                            'Error saving request: ' . $saveException->getMessage()
-                        );
-
-                        if ($exception === null) {
-                            $exception = $saveException;
-                        }
-                    }
-                }
-
-                if ($exception !== null) {
-                    // Continue running the next job as the requests in a job are sequential
-                    continue 2;
-                }
+        /** @var Request[] $requests */
+        $requests = $job->getRequestCollection();
+        foreach ($requests as $request) {
+            if ($request->getIsSynced()) {
                 $previousRequestResult = $request->getResult();
+                continue;
             }
 
-            $job->setCompleted(true);
-            $this->jobRepository->save($job);
+            if (!$skipValidation && !$this->checkRetryLimit($request)) {
+                return;
+            }
+
+            $exception = null;
+            try {
+                /** @var TypeInterface $type */
+                $request->setAttempt(($request->getAttempt() + 1));
+                $type = $typePool[$request->getTypeCode()];
+
+                $type->unpack([...$request->getPayload(), self::PREVIOUS_RESULT => $previousRequestResult]);
+
+                $type->beforeExecute($job, $request);
+
+                $request->setIsSynced(true);
+            } catch (\Throwable $exception) {
+                $this->handleException($job, $request, $exception);
+            } finally {
+                try {
+                    $this->requestRepository->save($request);
+                } catch (\Throwable $saveException) {
+                    // Log the save exception
+                    $type->getConnector()->getLogger()->log(
+                        'Error saving request: ' . $saveException->getMessage()
+                    );
+
+                    if ($exception === null) {
+                        $exception = $saveException;
+                    }
+                }
+            }
+
+            if ($exception !== null) {
+                // Continue running the next job as the requests in a job are sequential
+                return;
+            }
+            $previousRequestResult = $request->getResult();
         }
+
+        $job->setCompleted(true);
+        $this->jobRepository->save($job);
     }
 
     /**

@@ -3,6 +3,7 @@
     <!-- Interface preferences -->
     <preference for="Leat\Loyalty\Model\RateLimiterInterface" type="Leat\Loyalty\Model\RateLimiter" />
     <preference for="Leat\Loyalty\Api\ApplyBalanceInterface" type="Leat\Loyalty\Model\ApplyBalance" />
+    <preference for="Leat\Loyalty\Api\Data\VoucherBreakdownLineInterface" type="Leat\Loyalty\Model\Voucher\VoucherBreakdownLine" />
     <preference for="Leat\Loyalty\Api\ApplyGiftCardInterface" type="Leat\Loyalty\Model\ApplyGiftCard" />
     <preference for="Leat\Loyalty\Api\Data\ApplyBalanceResultInterface" type="Leat\Loyalty\Model\Data\ApplyBalanceResult" />
     <preference for="Leat\Loyalty\Api\Data\ApplyGiftCardResultInterface" type="Leat\Loyalty\Model\Data\ApplyGiftCardResult" />
@@ -52,11 +53,25 @@
         </arguments>
     </type>
 
+    <!-- Every applied voucher of a reward counts for fixed amount rules -->
+    <type name="Magento\SalesRule\Model\Rule\Action\Discount\CartFixed">
+        <plugin name="leat_loyalty_scale_fixed_discount" type="Leat\Loyalty\Plugin\SalesRule\ScaleFixedDiscountPlugin" />
+    </type>
+    <type name="Magento\SalesRule\Model\Rule\Action\Discount\ByFixed">
+        <plugin name="leat_loyalty_scale_fixed_discount" type="Leat\Loyalty\Plugin\SalesRule\ScaleFixedDiscountPlugin" />
+    </type>
+
     <!-- SalesRule Extension Attributes Plugin -->
     <type name="Magento\SalesRule\Api\RuleRepositoryInterface">
         <plugin name="leat_loyalty_salesrule_extension_attributes"
                 type="Leat\Loyalty\Plugin\SalesRule\ExtensionAttributesPlugin"
                 sortOrder="20" />
+    </type>
+
+    <!-- Per-voucher discount breakdown on cart totals -->
+    <type name="Magento\Quote\Api\CartTotalRepositoryInterface">
+        <plugin name="leat_loyalty_voucher_breakdown"
+                type="Leat\Loyalty\Plugin\Quote\CartTotalRepositoryPlugin" />
     </type>
 
     <!-- SalesRule Model Plugins -->
@@ -84,6 +99,17 @@
         <plugin name="leat_loyalty_enforce_gift_item_quantities"
                 type="Leat\Loyalty\Plugin\Quote\EnforceGiftItemQuantitiesPlugin"
                 sortOrder="20" />
+        <plugin name="leat_loyalty_reset_discount_arrays"
+                type="Leat\Loyalty\Plugin\Quote\ResetDiscountArraysPlugin"
+                sortOrder="30" />
+    </type>
+
+    <!-- Voucher gifts can only be removed by removing the voucher -->
+    <type name="Magento\Checkout\Model\Cart">
+        <plugin name="leat_loyalty_protect_gift_items" type="Leat\Loyalty\Plugin\Quote\ProtectGiftItemsPlugin"/>
+    </type>
+    <type name="Magento\Quote\Api\CartItemRepositoryInterface">
+        <plugin name="leat_loyalty_protect_gift_items_api" type="Leat\Loyalty\Plugin\Quote\ProtectGiftItemsPlugin"/>
     </type>
 
     <!-- Prevent gift card items from being merged in cart -->
