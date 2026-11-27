@@ -21,4 +21,26 @@
             </argument>
         </arguments>
     </type>
+
+    <!-- Admin grids -->
+    <type name="Leat\AsyncQueue\Model\ResourceModel\Job\Grid\Collection">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">async_queue_job</argument>
+            <argument name="resourceModel" xsi:type="string">Leat\AsyncQueue\Model\ResourceModel\Job</argument>
+        </arguments>
+    </type>
+    <type name="Leat\AsyncQueue\Model\ResourceModel\Request\Grid\Collection">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">async_queue_request</argument>
+            <argument name="resourceModel" xsi:type="string">Leat\AsyncQueue\Model\ResourceModel\Request</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="leat_asyncqueue_job_listing_data_source" xsi:type="string">Leat\AsyncQueue\Model\ResourceModel\Job\Grid\Collection</item>
+                <item name="leat_asyncqueue_request_listing_data_source" xsi:type="string">Leat\AsyncQueue\Model\ResourceModel\Request\Grid\Collection</item>
+            </argument>
+        </arguments>
+    </type>
 </config>

@@ -56,6 +56,20 @@ Sync status widgets rendered in the admin system config panel via `AbstractStatu
 All status blocks display a neutral "Awaiting first sync..." message before the first cron run, a "Sync in progress..."
 notice during active execution, and either a timestamped success or error message afterwards.
 
+### Async Queue Views
+
+Two places where the queue of `Leat_AsyncQueue` shows up outside its own menu:
+
+- **Queue Errors banner** (`Status/QueueErrors`) is the first group of the Leat configuration (sort order 0). The group
+  has no label and no fields, its frontend model renders the whole banner, so it is always visible. Red when a request
+  is out of retries, yellow while requests are failing, green when none are. The table lists failing requests of open
+  jobs, most recent first, with the attempts, the latest failure and the date of the latest failure; each row links to its
+  job (when the admin may view the queue). On a website or store scope only the jobs of that scope are listed. The look
+  follows the Amasty license banner.
+- **Leat Queue Jobs tab** on the customer (`customer_form.xml`, `Ui/Component/Form/JobsFieldset`) embeds the async queue
+  job grid filtered on the customer id. It is left out for admins without `Leat_AsyncQueue::jobs` and hidden for a
+  customer that is not saved yet.
+
 ### Coupon Usage Plugin
 
 #### UsagePlugin for SalesRule Coupon

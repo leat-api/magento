@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Leat\LoyaltyFrontend\Controller\Referral;
 
 use Leat\Loyalty\Model\Config;
+use Leat\Loyalty\Model\RequestRateLimiter;
 use Leat\Loyalty\Model\ResourceModel\Loyalty\ContactResource;
+use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
@@ -17,6 +19,10 @@ use Magento\Store\Model\StoreManagerInterface;
 
 class Subscribe implements HttpPostActionInterface
 {
+    private const RATE_LIMIT_KEY = 'referral_subscribe';
+    private const RATE_LIMIT_ATTEMPTS = 5;
+    private const RATE_LIMIT_WINDOW = 3600;
+
     /**
      * @param RequestInterface $request
      * @param JsonFactory $resultJsonFactory
@@ -24,6 +30,8 @@ class Subscribe implements HttpPostActionInterface
      * @param Config $config
      * @param StoreManagerInterface $storeManager
      * @param ContactResource $contactResource
+     * @param RequestRateLimiter $rateLimiter
+     * @param CustomerSession $customerSession
      */
     public function __construct(
         private readonly RequestInterface $request,
@@ -32,11 +40,14 @@ class Subscribe implements HttpPostActionInterface
         private readonly Config $config,
         private readonly StoreManagerInterface $storeManager,
         private readonly ContactResource $contactResource,
+        private readonly RequestRateLimiter $rateLimiter,
+        private readonly CustomerSession $customerSession,
     ) {
     }
 
     /**
-     * Execute referral subscribe action
+     * Execute referral subscribe action. Only our own validation messages reach the visitor; API errors are
+     * logged and replaced by a generic message so they cannot be used to probe for existing contacts.
      *
      * @return Json
      * @throws NoSuchEntityException
@@ -52,6 +63,19 @@ class Subscribe implements HttpPostActionInterface
                 throw new LocalizedException(__('Invalid form key'));
             }
 
+            // Unauthenticated and creates contacts for any email address: cap the attempts per customer + IP
+            if (!$this->rateLimiter->attempt(
+                self::RATE_LIMIT_KEY,
+                self::RATE_LIMIT_ATTEMPTS,
+                self::RATE_LIMIT_WINDOW,
+                (int)$this->customerSession->getCustomerId()
+            )) {
+                return $resultJson->setHttpResponseCode(429)->setData([
+                    'success' => false,
+                    'message' => __('Too many attempts. Please try again later.')
+                ]);
+            }
+
             $email = $this->request->getParam('email');
             $referralCode = $this->request->getParam('referral_code');
 
@@ -63,7 +87,14 @@ class Subscribe implements HttpPostActionInterface
                 throw new LocalizedException(__('Invalid referral code'));
             }
 
-            $this->contactResource->submitReferredContactCreation($email, $referralCode, $storeId);
+            try {
+                $this->contactResource->submitReferredContactCreation($email, $referralCode, $storeId);
+            } catch (\Exception $e) {
+                // API messages can reveal e.g. whether an email already exists, so never show them to the visitor
+                $logger->log('Error processing referral subscription: ' . $e->getMessage());
+
+                throw new LocalizedException(__('An error occurred. Please try again later.'));
+            }
 
             // Get the success message from configuration
             $successMessage = $this->config->getReferralPopupSuccessMessage($storeId);

@@ -1,0 +1,8 @@
+/*
+ * The request list on the job page: let the row action dropdown open over the page.
+ * Magento's grid wrapper scrolls inside itself (overflow-x: auto turns overflow-y into auto as well), which clips the
+ * dropdown and adds a scrollbar. The list has few columns, so it fits without the horizontal scroll.
+ */
+.leat-asyncqueue-requests .admin__data-grid-wrap {
+    overflow: visible;
+}

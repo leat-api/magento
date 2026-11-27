@@ -13,7 +13,8 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
 
 class QueueCleanup
 {
-    private const CLEANUP_CUTOFF = '-1 month';
+    public const RETENTION = '1 month';
+    public const CLEANUP_CUTOFF = '-' . self::RETENTION;
 
     /**
      * @var AdapterInterface

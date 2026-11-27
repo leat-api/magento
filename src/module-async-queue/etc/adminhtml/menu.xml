@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Leat_AsyncQueue::queue" title="Leat Loyalty Async Queue" translate="title" module="Leat_AsyncQueue"
+             sortOrder="60" parent="Magento_Backend::system" resource="Leat_AsyncQueue::jobs"/>
+        <add id="Leat_AsyncQueue::jobs" title="Jobs" translate="title" module="Leat_AsyncQueue"
+             sortOrder="10" parent="Leat_AsyncQueue::queue" action="leat_asyncqueue/job/index" resource="Leat_AsyncQueue::jobs"/>
+        <add id="Leat_AsyncQueue::jobs_attention" title="Needs attention" translate="title" module="Leat_AsyncQueue"
+             sortOrder="20" parent="Leat_AsyncQueue::queue" action="leat_asyncqueue/job/index/attention/1" resource="Leat_AsyncQueue::jobs"/>
+    </menu>
+</config>

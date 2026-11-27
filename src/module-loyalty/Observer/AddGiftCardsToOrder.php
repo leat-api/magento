@@ -7,7 +7,8 @@ namespace Leat\Loyalty\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Event\Observer;
 use Leat\Loyalty\Api\AppliedGiftCardRepositoryInterface;
-use Psr\Log\LoggerInterface;
+use Leat\Loyalty\Model\Connector;
+use Leat\Loyalty\Model\GiftCard\ApplicationService;
 
 class AddGiftCardsToOrder implements ObserverInterface
 {
@@ -17,20 +18,22 @@ class AddGiftCardsToOrder implements ObserverInterface
     private $appliedGiftCardRepository;
 
     /**
-     * @var LoggerInterface
+     * @var Connector
      */
-    private $logger;
+    private $leatConnector;
 
     /**
+     * Logs through the Leat logger (not Magento's) so every line passes the log filter.
+     *
      * @param AppliedGiftCardRepositoryInterface $appliedGiftCardRepository
-     * @param LoggerInterface $logger
+     * @param Connector $leatConnector
      */
     public function __construct(
         AppliedGiftCardRepositoryInterface $appliedGiftCardRepository,
-        LoggerInterface $logger
+        Connector $leatConnector
     ) {
         $this->appliedGiftCardRepository = $appliedGiftCardRepository;
-        $this->logger = $logger;
+        $this->leatConnector = $leatConnector;
     }
 
     /**
@@ -65,11 +68,15 @@ class AddGiftCardsToOrder implements ObserverInterface
                 $this->appliedGiftCardRepository->save($orderGiftCard);
             }
         } catch (\Exception $e) {
-            $this->logger->error('Error transferring gift cards to order: ' . $e->getMessage(), [
-                'quote_id' => $quote->getId(),
-                'order_id' => $order->getId(),
-                'exception' => $e
-            ]);
+            $this->leatConnector->getLogger(ApplicationService::LOGGER_PURPOSE)->log(
+                'Error transferring gift cards to order: ' . $e->getMessage(),
+                false,
+                [
+                    'quote_id' => $quote->getId(),
+                    'order_id' => $order->getId(),
+                    'exception_trace' => $e->getTraceAsString(),
+                ]
+            );
         }
     }
 }

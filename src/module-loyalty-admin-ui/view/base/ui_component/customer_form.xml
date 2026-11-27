@@ -9,4 +9,34 @@
             </settings>
         </field>
     </fieldset>
+    <!-- Queue jobs of this customer: the job listing, filtered on the customer id (the job's relation id) -->
+    <fieldset name="leat_async_jobs" class="Leat\LoyaltyAdminUI\Ui\Component\Form\JobsFieldset" sortOrder="200">
+        <settings>
+            <label translate="true">Leat Queue Jobs</label>
+            <imports>
+                <!-- A customer that is not saved yet has no jobs -->
+                <link name="visible">${ $.provider }:data.customer.entity_id</link>
+            </imports>
+        </settings>
+        <insertListing name="leat_asyncqueue_job_listing">
+            <settings>
+                <autoRender>true</autoRender>
+                <dataScope>leat_asyncqueue_job_listing</dataScope>
+                <ns>leat_asyncqueue_job_listing</ns>
+                <externalProvider>leat_asyncqueue_job_listing.leat_asyncqueue_job_listing_data_source</externalProvider>
+                <selectionsProvider>leat_asyncqueue_job_listing.leat_asyncqueue_job_listing.leat_asyncqueue_job_columns.ids</selectionsProvider>
+                <dataLinks>
+                    <imports>false</imports>
+                    <exports>false</exports>
+                </dataLinks>
+                <externalFilterMode>true</externalFilterMode>
+                <exports>
+                    <link name="relation_id">${ $.externalProvider }:params.relation_id</link>
+                </exports>
+                <imports>
+                    <link name="relation_id">${ $.provider }:data.customer.entity_id</link>
+                </imports>
+            </settings>
+        </insertListing>
+    </fieldset>
 </form>

@@ -1,5 +1,33 @@
 # Leat Loyalty Module Changelog
 
+# 2.1.0 - Async queue admin
+
+## NEW FEATURES
+
+### Async queue in the admin
+Jobs and requests of the async queue are no longer only visible to developers. See the AsyncQueue README for details.
+
+* New menu **System > Leat Loyalty Async Queue** with *Jobs* and *Needs attention*.
+* Job grid with the customer, request totals, *Has failures*, *Needs admin intervention* (a request reached 9 attempts), *Blocked* and *Blocked by job*. Jobs that are completed are never flagged.
+* Job page: edit a job (relation, source, store, completed) with the listing of its requests below it. A request has its own edit page (attempts, synced, payload as pretty printed JSON, result and latest failure).
+* Actions on rows, in bulk and on the pages: reset attempts, retry job now and mark as synced / completed. Skipping a request sits in a dropdown behind a confirmation and writes who did it to the request.
+* Permissions: `Leat_AsyncQueue::jobs` (view), `::manage` (edit, reset, retry), `::edit_payload` (edit payloads, validated as JSON before saving) and `::mark_synced` (skip requests, complete jobs).
+* **Queue Errors** banner on top of the Leat configuration: failing requests with the latest failure and its date, each linking to its job. Red when a request is out of retries, yellow while requests are failing, green when none are. Limited to the jobs of the selected website or store.
+* **Leat Queue Jobs** tab on the customer: the job grid filtered on that customer.
+* Admin system message while requests have run out of retries.
+
+## SECURITY
+* Rate limiting per customer + IP on referral subscribe, gift card balance check and REST gift card apply. Behind a proxy or CDN, configure Magento's `RemoteAddress` (`trustedProxies`), otherwise all visitors share one allowance.
+* Leat log lines are filtered: gift card codes, tokens and form keys are masked, bearer tokens are masked in messages, and user input can no longer forge log lines.
+
+## FIXES
+* Referral popup: it was marked as shown the moment it opened, so a popup hidden behind another overlay (e.g. a store selector) never came back. The state is now kept per referral code in `localStorage` as `shown`, `dismissed` or `accepted`; the popup shows again on reload unless the visitor dismissed it or signed up. `dismissed` and `accepted` are permanent.
+* Referral signup: errors from the Leat API are logged and replaced by a generic message, so they can no longer be used to find out whether an email is already known.
+
+## CHANGES
+* All Leat ACL resources are grouped under one category, **Leat Loyalty** (`Leat_Loyalty::leat`); before, they were spread over the root and System. Resource ids are unchanged, so saved roles keep working, but the new parent is not ticked in existing roles until they are saved again.
+* `Leat_AsyncQueue` depends on `Magento_Backend` and `Magento_Ui` (module sequence).
+
 # 2.0.1 - Earn points, stackable vouchers, newsletter sync
 
 ## NEW FEATURES

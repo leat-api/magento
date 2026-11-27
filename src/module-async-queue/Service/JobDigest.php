@@ -38,6 +38,12 @@ class JobDigest
     private const int MAX_RETRY_ATTEMPTS = 8;
 
     /**
+     * Value of the stored `attempt` column at which a request is no longer retried (the ninth attempt).
+     * Requests at this value need admin intervention.
+     */
+    public const int MAX_ATTEMPTS = self::MAX_RETRY_ATTEMPTS + 1;
+
+    /**
      * Used in a linear progression.
      * The first attempt
      */
@@ -75,19 +81,34 @@ class JobDigest
     {
         /** @var Job $job */
         foreach ($this->getJobs() as $job) {
-            // One runner per job: the cron and an immediate run (e.g. an earn points claim) must not
-            // execute the same request twice. A job that is locked is being handled by someone else.
-            $lockName = self::LOCK_PREFIX . $job->getJobId();
-            if (!$this->lockManager->lock($lockName, 0)) {
-                continue;
-            }
-
-            try {
-                $this->processJob($job);
-            } finally {
-                $this->lockManager->unlock($lockName);
-            }
+            $this->executeJob($job);
         }
+    }
+
+    /**
+     * Run one job under its lock.
+     * One runner per job: the cron and an immediate run (e.g. an earn points claim, an admin retry) must not
+     * execute the same request twice. A job that is locked is being handled by someone else.
+     *
+     * @param Job $job
+     * @return bool false when the job was not run because it is locked
+     * @throws AuthenticationException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function executeJob(Job $job): bool
+    {
+        $lockName = self::LOCK_PREFIX . $job->getJobId();
+        if (!$this->lockManager->lock($lockName, 0)) {
+            return false;
+        }
+
+        try {
+            $this->processJob($job);
+        } finally {
+            $this->lockManager->unlock($lockName);
+        }
+
+        return true;
     }
 
     /**

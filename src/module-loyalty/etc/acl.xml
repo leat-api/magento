@@ -4,7 +4,11 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Leat_Loyalty::config" title="Allow changing Leat Configuration" sortOrder="11"/>
+                <!-- One main category for everything Leat. Declared in every Leat module that adds resources (same
+                     id and title, Magento merges them), so each module also works without the others. -->
+                <resource id="Leat_Loyalty::leat" title="Leat Loyalty" sortOrder="11">
+                    <resource id="Leat_Loyalty::config" title="Configuration" sortOrder="10"/>
+                </resource>
             </resource>
         </resources>
     </acl>

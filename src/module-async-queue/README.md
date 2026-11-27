@@ -247,3 +247,58 @@ The module can be configured through:
 - Cron schedules in `crontab.xml`
 - Maximum execution parameters in `JobDigest.php`
 - Email templates for error notification
+
+## Admin
+
+**System > Leat Loyalty Async Queue** has two entries: *Jobs* (every job) and *Needs attention* (open jobs with at least
+one failing request). Both are the same grid, the second with a preset filter.
+
+- **Job grid** shows per job the customer, request totals, *Has failures*, *Needs admin intervention* (a request reached
+  `JobDigest::MAX_ATTEMPTS`, 9 stored attempts), *Blocked* and *Blocked by job*. A completed job is never flagged:
+  the cron does not run it again, so leftover failures on it are not actionable (the requests still show their own
+  status on the job page).
+- **Blocked** means an earlier job of the same customer is still open. *Blocked by job* shows the oldest of those, so a
+  chain of jobs clears one job at a time. Plugins on `JobDigest::validateJob()` can let a job through anyway; the grid
+  follows them through `Model/ResourceModel/Job/Grid/BlockExemptionInterface` (see Extending).
+- **Job edit page** is the job form plus the listing of its requests. A request opens its own edit page, which links back.
+  The payload is shown pretty printed and must be valid JSON (an object or array) before it is saved; a rejected
+  payload stays in the form. Completed jobs show when the cleanup cron removes them (`QueueCleanup::RETENTION`).
+- **Actions** (row and form buttons, POST only, one job or request at a time): reset attempts, retry job now, mark as synced / completed. Marking as synced
+  skips a request without sending it, so it sits in a dropdown behind a confirmation and writes who did it to the first
+  line of the request's fail reason. Later requests in the job then get no result from the skipped one.
+- **Retry now** skips the retry delay and limit, but not the validation: a job that waits on an earlier one is refused.
+- Every change takes the same per job lock as the cron; a job that is being processed is refused, not queued.
+- A system message appears while requests of open jobs have run out of retries.
+- `Leat_LoyaltyAdminUI` adds two views on the same data: a **Queue Errors** banner at the top of the Leat configuration
+  and a **Leat Queue Jobs** tab on the customer (the job grid filtered on that customer). See its README.
+
+| ACL resource | Allows |
+|---|---|
+| `Leat_AsyncQueue::jobs` | View jobs, requests and the menu |
+| `Leat_AsyncQueue::manage` | Edit relation/source/store/attempts, reset, retry |
+| `Leat_AsyncQueue::edit_payload` | Edit a request payload (needs `manage` too) |
+| `Leat_AsyncQueue::mark_synced` | Mark requests as synced, complete jobs |
+
+All Leat resources sit under one category, **Leat Loyalty** (`Leat_Loyalty::leat`), next to `Leat_Loyalty::config`
+and `Leat_AsyncQueue::config`. Each Leat module that adds resources declares that parent with the same id and title.
+Existing roles need the new resources ticked. Fields and actions an admin may not use are disabled or left out, and the
+controllers check the same permissions.
+
+"Failing" and "exhausted" are defined once, in `Model/RequestStatus.php`.
+
+### Extending
+
+If a plugin on `JobDigest::validateJob()` lets a job run while earlier jobs are open, add the same rule to the grid:
+implement `BlockExemptionInterface::getSql()` (SQL, true when the job is exempt) and register it in `di.xml`:
+
+```xml
+<type name="Leat\AsyncQueue\Model\ResourceModel\Job\Grid\Collection">
+    <arguments>
+        <argument name="blockExemptions" xsi:type="array">
+            <item name="my_rule" xsi:type="object">Vendor\Module\Model\MyExemption</item>
+        </argument>
+    </arguments>
+</type>
+```
+
+`Leat\LoyaltyAsync\Model\ResourceModel\ContactCreateExemption` is the example.

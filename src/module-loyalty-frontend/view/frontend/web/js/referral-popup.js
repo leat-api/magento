@@ -8,7 +8,39 @@ define([
     'use strict';
 
     return function (config) {
-        var modalInstance = null;
+        var modalInstance = null,
+            accepted = false,
+            STATE_SHOWN = 'shown',          // opened but never interacted with (e.g. covered by another overlay)
+            STATE_DISMISSED = 'dismissed',  // user closed it
+            STATE_ACCEPTED = 'accepted';    // user submitted the form
+
+        /**
+         * Get the stored popup state for a referral code (empty when unset or storage is unavailable)
+         *
+         * @param {String} code
+         * @returns {String}
+         */
+        function getState(code) {
+            try {
+                return localStorage.getItem('leat_referral_' + code) || '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        /**
+         * Store the popup state for a referral code (no expiry)
+         *
+         * @param {String} code
+         * @param {String} state
+         */
+        function setState(code, state) {
+            try {
+                localStorage.setItem('leat_referral_' + code, state);
+            } catch (e) {
+                // storage blocked: popup simply shows again next time
+            }
+        }
 
         /**
          * Get URL parameter
@@ -30,8 +62,9 @@ define([
             var referralCode = getUrlParameter('___referral-code');
 
             if (referralCode) {
-                // Store referral code in session storage to avoid showing popup on page reload
-                if (!sessionStorage.getItem('referral_shown_' + referralCode)) {
+                // Only 'dismissed' / 'accepted' suppress the popup; no cookie or 'shown' re-shows it on reload
+                var state = getState(referralCode);
+                if (state !== STATE_DISMISSED && state !== STATE_ACCEPTED) {
                     // Fetch popup content
                     $.ajax({
                         url: urlBuilder.build('leat/referral/popup'),
@@ -59,15 +92,17 @@ define([
                                     clickableOverlay: true,
                                     buttons: [],
                                     closed: function() {
-                                        // Cleanup if needed
+                                        if (!accepted) {
+                                            setState(referralCode, STATE_DISMISSED);
+                                        }
                                     }
                                 }, $('#leat-referral-modal'));
 
                                 // Open modal
                                 modalInstance.openModal();
 
-                                // Mark as shown in session storage
-                                sessionStorage.setItem('referral_shown_' + referralCode, 'true');
+                                // Mark as shown; becomes dismissed/accepted only on user action
+                                setState(referralCode, STATE_SHOWN);
 
                                 // Setup event handlers
                                 setupPopupEvents(referralCode);
@@ -109,6 +144,8 @@ define([
                         submitBtn.prop('disabled', false).removeClass('loading');
 
                         if (response.success) {
+                            accepted = true;
+                            setState(referralCode, STATE_ACCEPTED);
                             form.hide();
                             $('.leat-referral-popup-success').html(response.message).show();
 

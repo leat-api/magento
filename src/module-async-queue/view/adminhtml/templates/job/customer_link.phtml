@@ -1,0 +1,17 @@
+<?php
+/** @var \Leat\AsyncQueue\Block\Adminhtml\Job\CustomerLink $block */
+/** @var \Magento\Framework\Escaper $escaper */
+$customer = $block->getCustomer();
+?>
+<div class="admin__field">
+    <label class="admin__field-label"><span><?= $escaper->escapeHtml(__('Customer')) ?></span></label>
+    <div class="admin__field-control">
+        <?php if ($customer === null): ?>
+            <span>&mdash;</span>
+        <?php elseif ($customer['url'] === null): ?>
+            <span><?= $escaper->escapeHtml($customer['label']) ?></span>
+        <?php else: ?>
+            <a href="<?= $escaper->escapeUrl($customer['url']) ?>" target="_blank"><?= $escaper->escapeHtml($customer['label']) ?></a>
+        <?php endif; ?>
+    </div>
+</div>

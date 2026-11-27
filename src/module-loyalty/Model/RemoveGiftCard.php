@@ -52,6 +52,7 @@ class RemoveGiftCard implements RemoveGiftCardInterface
         } catch (NoSuchEntityException $e) {
             $logger->log(
                 'Error removing giftcard (NoSuchEntity): ' . $e->getMessage(),
+                false,
                 [
                     'exception_trace' => $e->getTraceAsString(),
                     'cartId' => $cartId,
@@ -62,6 +63,7 @@ class RemoveGiftCard implements RemoveGiftCardInterface
         } catch (CouldNotDeleteException $e) {
             $logger->log(
                 'Error removing giftcard (CouldNotDelete): ' . $e->getMessage(),
+                false,
                 [
                     'exception_trace' => $e->getTraceAsString(),
                     'cartId' => $cartId,
@@ -72,6 +74,7 @@ class RemoveGiftCard implements RemoveGiftCardInterface
         } catch (\Exception $e) {
             $logger->log(
                 'Generic error removing giftcard: ' . $e->getMessage(),
+                false,
                 [
                     'exception_trace' => $e->getTraceAsString(),
                     'cartId' => $cartId,

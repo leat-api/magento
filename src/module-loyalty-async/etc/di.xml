@@ -44,6 +44,15 @@
         </arguments>
     </type>
 
+    <!-- The job grid must not call a job blocked when the JobValidation plugin below lets it run -->
+    <type name="Leat\AsyncQueue\Model\ResourceModel\Job\Grid\Collection">
+        <arguments>
+            <argument name="blockExemptions" xsi:type="array">
+                <item name="contact_create" xsi:type="object">Leat\LoyaltyAsync\Model\ResourceModel\ContactCreateExemption</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- Plugins for job handling -->
     <type name="Leat\AsyncQueue\Service\JobDigest">
         <plugin name="leat_loyalty_job_validate" type="Leat\LoyaltyAsync\Plugin\JobDigest\JobValidation"/>
