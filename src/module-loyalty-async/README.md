@@ -147,6 +147,13 @@ Magento newsletter status is mirrored to Leat subscription types.
   so stores connected to different Leat accounts only see the first account's types.
 - The request types only change types whose state differs from the wanted one.
 
+## Job validation
+
+`Plugin/JobDigest/JobValidation` lets a job run while earlier jobs of the same customer are still open, when another job
+of that customer has an unsynced `contact_create` request (`JobQueries::hasContactCreateRequest()`): the contact has to
+be created first. The admin job grid must agree with the cron, so `Model/ResourceModel/ContactCreateExemption` repeats
+the rule in SQL and registers it as a `BlockExemption` on the grid. Change one, change the other.
+
 ## Cron Jobs
 
 The module provides several scheduled tasks:

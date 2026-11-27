@@ -4,7 +4,16 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Leat_AsyncQueue::config" title="Allow changing Async Queue Configuration" sortOrder="11"/>
+                <!-- Same category as in Leat_Loyalty, see there -->
+                <resource id="Leat_Loyalty::leat" title="Leat Loyalty" sortOrder="11">
+                    <resource id="Leat_AsyncQueue::config" title="Async Queue: configuration" sortOrder="20"/>
+                    <resource id="Leat_AsyncQueue::jobs" title="Async Queue: view jobs and requests" sortOrder="30">
+                        <resource id="Leat_AsyncQueue::manage" title="Edit jobs and requests, reset attempts, retry" sortOrder="10">
+                            <resource id="Leat_AsyncQueue::edit_payload" title="Edit request payloads" sortOrder="10"/>
+                            <resource id="Leat_AsyncQueue::mark_synced" title="Mark requests and jobs as synced / completed" sortOrder="20"/>
+                        </resource>
+                    </resource>
+                </resource>
             </resource>
         </resources>
     </acl>

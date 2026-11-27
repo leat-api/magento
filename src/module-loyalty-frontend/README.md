@@ -205,7 +205,9 @@ A popup that appears when visitors arrive with a referral link containing the `_
 
 **Technical implementation:**
 - Uses AJAX to load popup content only when needed
-- Session storage to prevent multiple popups
+- The popup state is kept per referral code in `localStorage` (`leat_referral_<code>`): `shown` (opened, not interacted with), `dismissed` (closed by the visitor) or `accepted` (form submitted)
+- The popup shows again on reload unless the state is `dismissed` or `accepted`, so a popup covered by another overlay (e.g. a store/country selector) is not lost. `dismissed` and `accepted` do not expire
+- API errors from the signup are logged and answered with a generic message; only validation messages are shown to the visitor
 
 ### Frontend Components
 The module includes various frontend components for the Leat loyalty system:

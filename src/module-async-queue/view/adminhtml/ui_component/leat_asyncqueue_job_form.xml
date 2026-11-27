@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edit view of a job and, below it, the listing of its requests. -->
+<form xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">leat_asyncqueue_job_form.leat_asyncqueue_job_form_data_source</item>
+        </item>
+        <item name="template" xsi:type="string">templates/form/collapsible</item>
+    </argument>
+    <settings>
+        <buttons>
+            <button name="back" class="Leat\AsyncQueue\Ui\Component\Form\Button\Back"/>
+            <button name="retry" class="Leat\AsyncQueue\Ui\Component\Form\Button\Retry"/>
+            <button name="more" class="Leat\AsyncQueue\Ui\Component\Form\Button\MoreActions"/>
+            <button name="save" class="Leat\AsyncQueue\Ui\Component\Form\Button\Save"/>
+        </buttons>
+        <namespace>leat_asyncqueue_job_form</namespace>
+        <dataScope>data</dataScope>
+        <deps>
+            <dep>leat_asyncqueue_job_form.leat_asyncqueue_job_form_data_source</dep>
+        </deps>
+    </settings>
+    <dataSource name="leat_asyncqueue_job_form_data_source">
+        <argument name="data" xsi:type="array">
+            <item name="js_config" xsi:type="array">
+                <item name="component" xsi:type="string">Magento_Ui/js/form/provider</item>
+            </item>
+        </argument>
+        <settings>
+            <submitUrl path="leat_asyncqueue/job/save"/>
+        </settings>
+        <aclResource>Leat_AsyncQueue::jobs</aclResource>
+        <dataProvider class="Leat\AsyncQueue\Ui\DataProvider\JobForm" name="leat_asyncqueue_job_form_data_source">
+            <settings>
+                <requestFieldName>id</requestFieldName>
+                <primaryFieldName>job_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+    <fieldset name="general">
+        <settings>
+            <label translate="true">Job</label>
+            <collapsible>false</collapsible>
+        </settings>
+        <field name="job_id" formElement="input">
+            <settings>
+                <dataType>text</dataType>
+                <visible>false</visible>
+                <dataScope>job_id</dataScope>
+            </settings>
+        </field>
+        <container name="customer_link" sortOrder="10">
+            <htmlContent name="html_content">
+                <block name="leat_asyncqueue.job.customer_link" class="Leat\AsyncQueue\Block\Adminhtml\Job\CustomerLink" template="Leat_AsyncQueue::job/customer_link.phtml"/>
+            </htmlContent>
+        </container>
+        <field name="relation_id" formElement="input" sortOrder="20">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Relation ID (customer ID)</label>
+                <dataScope>relation_id</dataScope>
+                <imports>
+                    <link name="disabled">${ $.provider }:data.lock_manage</link>
+                </imports>
+            </settings>
+        </field>
+        <field name="source_id" formElement="input" sortOrder="30">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Source</label>
+                <dataScope>source_id</dataScope>
+                <imports>
+                    <link name="disabled">${ $.provider }:data.lock_manage</link>
+                </imports>
+            </settings>
+        </field>
+        <field name="store_id" formElement="input" sortOrder="40">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Store ID</label>
+                <dataScope>store_id</dataScope>
+                <validation>
+                    <rule name="validate-digits" xsi:type="boolean">true</rule>
+                </validation>
+                <imports>
+                    <link name="disabled">${ $.provider }:data.lock_manage</link>
+                </imports>
+            </settings>
+        </field>
+        <field name="completed" formElement="checkbox" sortOrder="50">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">job</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>boolean</dataType>
+                <label translate="true">Completed</label>
+                <dataScope>completed</dataScope>
+                <notice translate="true">Completing a job skips its open requests. Requires the permission to mark requests as synced.</notice>
+                <imports>
+                    <link name="disabled">${ $.provider }:data.lock_sync</link>
+                </imports>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="string">0</map>
+                            <map name="true" xsi:type="string">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+        <field name="created_at" formElement="input" sortOrder="60">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Created</label>
+                <dataScope>created_at</dataScope>
+                <disabled>true</disabled>
+            </settings>
+        </field>
+        <field name="updated_at" formElement="input" sortOrder="70">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Updated</label>
+                <dataScope>updated_at</dataScope>
+                <disabled>true</disabled>
+            </settings>
+        </field>
+        <field name="removal" formElement="textarea" sortOrder="80">
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Cleanup</label>
+                <dataScope>removal</dataScope>
+                <disabled>true</disabled>
+            </settings>
+        </field>
+    </fieldset>
+    <fieldset name="requests">
+        <settings>
+            <label translate="true">Requests</label>
+            <collapsible>false</collapsible>
+            <additionalClasses>
+                <class name="leat-asyncqueue-requests">true</class>
+            </additionalClasses>
+        </settings>
+        <insertListing name="leat_asyncqueue_request_listing">
+            <settings>
+                <autoRender>true</autoRender>
+                <dataScope>leat_asyncqueue_request_listing</dataScope>
+                <ns>leat_asyncqueue_request_listing</ns>
+                <externalProvider>leat_asyncqueue_request_listing.leat_asyncqueue_request_listing_data_source</externalProvider>
+                <selectionsProvider>leat_asyncqueue_request_listing.leat_asyncqueue_request_listing.leat_asyncqueue_request_columns.ids</selectionsProvider>
+                <dataLinks>
+                    <imports>false</imports>
+                    <exports>false</exports>
+                </dataLinks>
+                <externalFilterMode>true</externalFilterMode>
+                <exports>
+                    <link name="job_id">${ $.externalProvider }:params.job_id</link>
+                </exports>
+                <imports>
+                    <link name="job_id">${ $.provider }:data.job_id</link>
+                </imports>
+            </settings>
+        </insertListing>
+    </fieldset>
+</form>

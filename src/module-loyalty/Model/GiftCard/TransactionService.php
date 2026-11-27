@@ -119,13 +119,13 @@ class TransactionService
                 $cardForRefund->setBaseAppliedAmount($refundableCardAmount);
                 $cardForRefund->setAppliedAmount($refundableCardAmount);
 
+                // The code goes in the context so the log filter masks it.
                 $this->logger->log(sprintf(
-                    'setting giftcard amount for %s to %s out of %s. Total credit refund remaining: %s',
-                    $card->getGiftCardCode(),
+                    'setting giftcard amount to %s out of %s. Total credit refund remaining: %s',
                     $refundableCardAmount,
                     $card->getBaseAppliedAmount(),
                     $refundAmount
-                ));
+                ), false, ['gift_card_code' => $card->getGiftCardCode()]);
 
                 $cardsForRefund[] = $cardForRefund;
             }

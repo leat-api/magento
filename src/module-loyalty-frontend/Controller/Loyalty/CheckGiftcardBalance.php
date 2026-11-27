@@ -16,10 +16,14 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Pricing\Helper\Data as PriceHelper;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\Session\SessionManagerInterface;
+use Leat\Loyalty\Model\RequestRateLimiter;
+use Magento\Customer\Model\Session as CustomerSession;
 
 class CheckGiftcardBalance implements HttpPostActionInterface
 {
+    private const RATE_LIMIT_KEY = 'giftcard_balance_check';
+    private const RATE_LIMIT_WINDOW = 86400; // checks per day, see Config::getMaxGiftcardBalanceChecks
+
     private ?Logger $leatLogger = null;
 
     /**
@@ -31,7 +35,8 @@ class CheckGiftcardBalance implements HttpPostActionInterface
      * @param DateTime $dateTime
      * @param PriceHelper $priceHelper
      * @param TimezoneInterface $localeDate
-     * @param SessionManagerInterface $session
+     * @param RequestRateLimiter $rateLimiter
+     * @param CustomerSession $customerSession
      */
     public function __construct(
         private readonly JsonFactory $resultJsonFactory,
@@ -42,7 +47,8 @@ class CheckGiftcardBalance implements HttpPostActionInterface
         private readonly DateTime $dateTime,
         private readonly PriceHelper $priceHelper,
         private readonly TimezoneInterface $localeDate,
-        private readonly SessionManagerInterface $session
+        private readonly RequestRateLimiter $rateLimiter,
+        private readonly CustomerSession $customerSession
     ) {
          $this->leatLogger = $this->leatConnector->getLogger('leat_giftcard_balance_check');
     }
@@ -63,10 +69,15 @@ class CheckGiftcardBalance implements HttpPostActionInterface
              return $resultJson->setData($response);
         }
 
-        // Check rate limit based on session
-        if (!$this->checkRateLimit()) {
+        // Check rate limit per customer + IP: codes can be brute forced, a session cookie is easily thrown away
+        if (!$this->rateLimiter->attempt(
+            self::RATE_LIMIT_KEY,
+            $this->config->getMaxGiftcardBalanceChecks(),
+            self::RATE_LIMIT_WINDOW,
+            (int)$this->customerSession->getCustomerId()
+        )) {
             $response['message'] = __('Please try again later.');
-            $this->leatLogger->log('[CheckGiftcardBalance] Rate limit exceeded for session.', false);
+            $this->leatLogger->log('[CheckGiftcardBalance] Rate limit exceeded.', false);
             return $resultJson->setData($response);
         }
 
@@ -84,7 +95,7 @@ class CheckGiftcardBalance implements HttpPostActionInterface
 
         try {
             // --- Call Leat API to get gift card details ---
-            $this->leatLogger->log('[CheckGiftcardBalance] Checking hash: ' . $giftcardCode, true);
+            $this->leatLogger->log('[CheckGiftcardBalance] Checking hash', true, ['code' => $giftcardCode]);
             $giftcardData = $this->giftcardResource->findGiftcardByHash($giftcardCode);
 
             if (empty($giftcardData->getUuid())) {
@@ -137,39 +148,5 @@ class CheckGiftcardBalance implements HttpPostActionInterface
         }
 
         return $resultJson->setData($response);
-    }
-
-    /**
-     * Check if the current session has exceeded the rate limit for balance checks
-     *
-     * @return bool
-     */
-    private function checkRateLimit(): bool
-    {
-        $maxChecks = $this->config->getMaxGiftcardBalanceChecks();
-        $today = date('Y-m-d');
-
-        $rateLimitData = $this->session->getLeatGiftcardBalanceChecks() ?: [];
-
-        // Reset counter if it's a new day
-        if (!isset($rateLimitData['date']) || $rateLimitData['date'] !== $today) {
-            $rateLimitData = [
-                'date' => $today,
-                'count' => 0
-            ];
-        }
-
-        // Check if limit is exceeded
-        if ($rateLimitData['count'] >= $maxChecks) {
-            return false;
-        }
-
-        // Increment the counter
-        $rateLimitData['count']++;
-
-        // Save updated data back to session
-        $this->session->setLeatGiftcardBalanceChecks($rateLimitData);
-
-        return true;
     }
 }

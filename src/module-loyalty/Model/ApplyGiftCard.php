@@ -20,6 +20,10 @@ use Magento\Quote\Model\QuoteFactory;
  */
 class ApplyGiftCard implements ApplyGiftCardInterface
 {
+    private const RATE_LIMIT_KEY = 'giftcard_apply';
+    private const RATE_LIMIT_ATTEMPTS = 20;
+    private const RATE_LIMIT_WINDOW = 3600;
+
     public function __construct(
         private readonly Config $config,
         private readonly CartRepositoryInterface $quoteRepository,
@@ -29,7 +33,8 @@ class ApplyGiftCard implements ApplyGiftCardInterface
         private readonly AppliedGiftCardDetailsInterfaceFactory $appliedGiftCardDetailsFactory, // Added this
         private readonly Connector $leatConnector,
         private readonly PricingHelper $pricingHelper,
-        private readonly QuoteFactory $quoteFactory
+        private readonly QuoteFactory $quoteFactory,
+        private readonly RequestRateLimiter $rateLimiter
     ) {
     }
 
@@ -51,6 +56,17 @@ class ApplyGiftCard implements ApplyGiftCardInterface
 
             $quote = $this->quoteRepository->getActive((int)$cartId);
             $storeId = (int) $quote->getStoreId();
+
+            // The valid/invalid answer below lets a caller guess codes, so cap the attempts per customer + IP
+            if (!$this->rateLimiter->attempt(
+                self::RATE_LIMIT_KEY,
+                self::RATE_LIMIT_ATTEMPTS,
+                self::RATE_LIMIT_WINDOW,
+                (int) $quote->getCustomerId()
+            )) {
+                $result->setErrorMessage((string) __('Please try again later.'));
+                return $result;
+            }
 
             if (!$this->validatorService->isValid($code, $storeId)) {
                 $result->setErrorMessage((string) __('GiftCard is invalid or expired.'));

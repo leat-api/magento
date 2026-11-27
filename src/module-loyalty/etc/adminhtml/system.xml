@@ -10,7 +10,11 @@
             <label>Configuration</label>
             <tab>leat_loyalty</tab>
             <resource>Leat_Loyalty::config</resource>
-            <group id="connection" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="0">
+            <!-- Banner, no label and no fields: the frontend model renders all of it, so it is always visible -->
+            <group id="async_queue_errors" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="0">
+                <frontend_model>Leat\LoyaltyAdminUI\Block\Adminhtml\System\Config\Status\QueueErrors</frontend_model>
+            </group>
+            <group id="connection" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="1">
                 <label>Connection</label>
                 <field id="personal_access_token" translate="label,comment" type="obscure" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Personal Access Token</label>

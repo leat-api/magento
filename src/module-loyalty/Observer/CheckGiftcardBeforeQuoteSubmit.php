@@ -30,6 +30,7 @@ class CheckGiftcardBeforeQuoteSubmit implements ObserverInterface
     public function execute(Observer $observer)
     {
         $logger = $this->leatConnector->getLogger(ApplicationService::LOGGER_PURPOSE);
+        $code = '';
 
         try {
             /** @var CartInterface $quote */
@@ -50,7 +51,8 @@ class CheckGiftcardBeforeQuoteSubmit implements ObserverInterface
             }
 
             foreach ($appliedCards as $appliedCard) {
-                $giftcard = $this->validatorService->getCard($appliedCard->getGiftCardCode(), $storeId);
+                $code = (string) $appliedCard->getGiftCardCode();
+                $giftcard = $this->validatorService->getCard($code, $storeId);
                 if (!$giftcard || !$this->validatorService->isValid($giftcard, $storeId)) {
                     $this->applicationService->removeFromQuote($quoteId, (int) $appliedCard->getId());
                     throw new LocalizedException(__('Gift card %1 is no longer valid.', $appliedCard->getGiftCardCode()));
@@ -64,7 +66,9 @@ class CheckGiftcardBeforeQuoteSubmit implements ObserverInterface
                 $this->appliedGiftCardRepository->save($appliedCard);
             }
         } catch (LocalizedException $e) {
-            $logger->log('checkout failure: ' . $e->getMessage());
+            // The customer sees the full code in the message, the log file must not.
+            $message = $code === '' ? $e->getMessage() : str_replace($code, '***' . substr($code, -4), $e->getMessage());
+            $logger->log('checkout failure: ' . $message);
             throw $e;
         } catch (\Exception $e) {
         }

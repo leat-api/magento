@@ -41,12 +41,14 @@ class Logger
      * @param File $ioFile
      * @param DirectoryList $directoryList
      * @param Json $jsonSerializer
+     * @param LogFilter $logFilter
      */
     public function __construct(
         protected LoggerFormatter $loggerFormatter,
         protected File $ioFile,
         protected DirectoryList $directoryList,
-        protected Json $jsonSerializer
+        protected Json $jsonSerializer,
+        protected LogFilter $logFilter
     ) {
         // Self-init
         $this->initLoggerDefaults();
@@ -128,12 +130,20 @@ class Logger
     }
 
     /**
+     * Single write point for every Leat log line, so secrets and PII are filtered here whatever the caller passed.
      *
+     * @param mixed $message
+     * @param string $fileName
+     * @return $this
      */
     public function output($message, $fileName)
     {
         if ($fullFileName = $this->getFullInitedFilename($fileName)) {
-            $message = $this->loggerFormatter->prepareForOutput($message, false);
+            if (is_array($message)) {
+                // Arrays are dumped with print_r, which would write sensitive keys (form_key, code, ...) in clear.
+                $message = $this->logFilter->filterContext($message);
+            }
+            $message = $this->logFilter->filterMessage($this->loggerFormatter->prepareForOutput($message, false));
             $message = date('Y-m-d H:i:s') . ': ' . $message . PHP_EOL;
             file_put_contents($fullFileName, $message, FILE_APPEND);
         }
@@ -151,7 +161,7 @@ class Logger
     public function log($message, bool $debug = false, array $context = [])
     {
         if (!empty($context) && is_string($message)) {
-            $message = sprintf('%s [%s]', $message, $this->jsonSerializer->serialize($context));
+            $message = sprintf('%s [%s]', $message, $this->jsonSerializer->serialize($this->logFilter->filterContext($context)));
         }
 
         if ($debug) {

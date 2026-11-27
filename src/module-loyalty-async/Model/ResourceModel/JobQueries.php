@@ -21,6 +21,7 @@ class JobQueries
 
     /**
      * Check if the current customer has any subsequent jobs that have a contact create request
+     * - The admin job grid repeats this rule in SQL: ContactCreateExemption.
      *
      * @param JobInterface $job
      * @return bool

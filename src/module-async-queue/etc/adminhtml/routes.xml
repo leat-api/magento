@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
+    <router id="admin">
+        <route id="leat_asyncqueue" frontName="leat_asyncqueue">
+            <module name="Leat_AsyncQueue"/>
+        </route>
+    </router>
+</config>
